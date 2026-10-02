@@ -1,8 +1,11 @@
 FROM alpine:3.20
 
-# 安装 webhook、git、docker CLI（全部走 apk，避免访问 GitHub 下载）
-RUN apk add --no-cache git docker-cli docker-cli-compose webhook
+# 安装 git 和 docker CLI（webhook 二进制由构建上下文提供，避免联网下载）
+RUN apk add --no-cache git docker-cli docker-cli-compose
+
+COPY webhook /usr/local/bin/webhook
+RUN chmod +x /usr/local/bin/webhook
 
 EXPOSE 9000
 
-ENTRYPOINT ["/usr/bin/webhook"]
+ENTRYPOINT ["/usr/local/bin/webhook"]

@@ -1,5 +1,6 @@
 .env
 hooks.json
+webhook
 data.db
 data/
 __pycache__/
