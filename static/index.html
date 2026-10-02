@@ -56,7 +56,7 @@ nav button.on{color:var(--ac)}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .cal .wd{text-align:center;font-size:12px;color:var(--sub);padding:4px 0}
 .cal button{aspect-ratio:1/1.15;border:0;border-radius:14px;background:var(--card);box-shadow:var(--sh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-weight:600;padding:0}
-.cal button small{font-size:10px;color:var(--ac);font-weight:500;line-height:1.1}.cal button small.b{color:var(--or)}.cal button small.g{color:#3b82f6}
+.cal button small{font-size:10px;color:var(--ac);font-weight:500;line-height:1.1}.cal button small.b{color:var(--or)}.cal button small.g{color:#3b82f6}.cal button small.s{color:#8b5cf6}
 .cal button.t{outline:2px solid var(--ac)}.cal button.has{background:linear-gradient(180deg,var(--card),rgba(16,185,129,.12))}
 .cal i{visibility:hidden}
 label{display:block;margin:14px 0 4px;color:var(--sub);font-size:13px}
@@ -84,8 +84,13 @@ svg.ch{width:100%;height:auto;margin-top:6px}
 const $=s=>document.querySelector(s);
 const ymd=d=>d.toLocaleDateString('sv');
 const tmr=()=>{const d=new Date();d.setDate(d.getDate()+1);return ymd(d)};
-function sleepTxt(s){let t=(s.sleep_time?'🌙 '+esc(s.sleep_time):'')+(s.sleep_time&&s.wake_time?' → ':'')+(s.wake_time?'☀️ '+esc(s.wake_time):'');
- if(s.sleep_time&&s.wake_time){const a=s.sleep_time.split(':').map(Number),b=s.wake_time.split(':').map(Number);let m=(b[0]*60+b[1])-(a[0]*60+a[1]);if(m<0)m+=1440;t+=' · '+Math.floor(m/60)+'h'+(m%60)+'m'}return t}
+function dur(a,b){const x=a.split(':').map(Number),y=b.split(':').map(Number);let m=(y[0]*60+y[1])-(x[0]*60+x[1]);if(m<0)m+=1440;return Math.floor(m/60)+'h'+(m%60)+'m'}
+function sleepTxt(s){
+  const isNap=s.sleep_time&&s.wake_time&&s.sleep_time>='10:00'&&s.wake_time<='20:00';
+  if(isNap)return `😴 午休 ${esc(s.sleep_time)} → ${esc(s.wake_time)} · ${dur(s.sleep_time,s.wake_time)}`;
+  let t=(s.sleep_time?'🌙 '+esc(s.sleep_time):'')+(s.sleep_time&&s.wake_time?' → ':'')+(s.wake_time?'☀️ '+esc(s.wake_time):'');
+  if(s.sleep_time&&s.wake_time)t+=' · '+dur(s.sleep_time,s.wake_time);
+  return t}
 const MI={'早餐':'🌅','午餐':'🍱','晚餐':'🌙','加餐':'🍎'};
 const EX=['我刚起床，吃了一个拳头大小的无糖面包','晚上吃了一根香蕉，100kcal','1001健身记录\n羽毛球 1h\n高位下拉 4x12 20kg'];
 let token=localStorage.t||'',date=ymd(new Date()),view='day',imgs=[],chat={},profile={},calMonth=date.slice(0,7),calMode='c';
@@ -125,8 +130,8 @@ async function renderDay(){
     h+=`<div class="grp">${MI[t]} ${t} · ${Math.round(L.reduce((a,m)=>a+m.kcal,0))} kcal</div>`+L.map(m=>`<div class="row"><div class="n">${esc(m.name)}<small>${esc(m.time)} ${esc(m.amount)}</small></div><div class="k">${Math.round(m.kcal)}<button class="x" onclick="del('meals',${m.id})">✕</button></div></div>`).join('')}
   h+=`</div><div class="card"><div class="sec">运动<em>${d.burn} kcal</em></div>`;
   h+=d.workouts.map(w=>`<div class="row"><div class="n">${esc(w.name)}<small>${esc(w.detail)}</small></div><div class="k w">-${Math.round(w.kcal)}<button class="x" onclick="del('workouts',${w.id})">✕</button></div></div>`).join('')||`<div class="empty">还没有记录</div>`;
-  h+=`</div><div class="card"><div class="sec">体重<em>仅记录</em></div>`+(d.weights.map(w=>`<div class="row"><div class="n">⚖️ ${w.kg} kg</div><div class="k"><button class="x" onclick="del('weights',${w.id})">✕</button></div></div>`).join('')||`<div class="empty">还没有记录</div>`)
-  +`</div><div class="card"><div class="sec">作息<em>仅记录</em></div>`+(d.sleeps.map(s=>`<div class="row"><div class="n">${sleepTxt(s)}<small>${esc(s.note)}</small></div><div class="k"><button class="x" onclick="del('sleeps',${s.id})">✕</button></div></div>`).join('')||`<div class="empty">还没有记录</div>`)
+  h+=`</div><div class="card"><div class="sec">体重</div>`+(d.weights.map(w=>`<div class="row"><div class="n">⚖️ ${w.kg} kg</div><div class="k"><button class="x" onclick="del('weights',${w.id})">✕</button></div></div>`).join('')||`<div class="empty">还没有记录</div>`)
+  +`</div><div class="card"><div class="sec">作息</div>`+(d.sleeps.map(s=>`<div class="row"><div class="n">${sleepTxt(s)}<small>${esc(s.note)}</small></div><div class="k"><button class="x" onclick="del('sleeps',${s.id})">✕</button></div></div>`).join('')||`<div class="empty">还没有记录</div>`)
   +`</div><div id="chat"></div>`;
   $('#main').innerHTML=h;drawChat()}
 async function del(k,id){if(confirm('删除这条记录？')){await api(k+'/'+id,{method:'DELETE'});render()}}
@@ -142,8 +147,8 @@ function drawChat(){
     const inp=(t,j,v)=>`<input type="number" inputmode="numeric" value="${v}" ${m.done?'disabled':''} onchange="chat['${date}'][${i}].p.${t}[${j}].kcal=+this.value">`;
     p.meals.forEach((x,j)=>h+=`<div class="row"><div class="n">${MI[x.meal_type]||'🍽'} ${esc(x.name)}<small>${esc(x.meal_type)} ${esc(x.time)} ${esc(x.amount)}</small></div><div class="k">${inp('meals',j,x.kcal)}</div></div>`);
     p.workouts.forEach((x,j)=>h+=`<div class="row"><div class="n">🏃 ${esc(x.name)}<small>${esc(x.detail)}</small></div><div class="k w">${inp('workouts',j,x.kcal)}</div></div>`);
-    p.weights.forEach((x,j)=>h+=`<div class="row"><div class="n">⚖️ 体重<small>仅记录</small></div><div class="k"><input type="number" step="0.1" inputmode="decimal" value="${x.kg}" ${m.done?'disabled':''} onchange="chat['${date}'][${i}].p.weights[${j}].kg=+this.value"> kg</div></div>`);
-    p.sleeps.forEach(x=>h+=`<div class="row"><div class="n">${sleepTxt(x)}<small>作息 · 仅记录 ${esc(x.note)}</small></div></div>`);
+    p.weights.forEach((x,j)=>h+=`<div class="row"><div class="n">⚖️ 体重</div><div class="k"><input type="number" step="0.1" inputmode="decimal" value="${x.kg}" ${m.done?'disabled':''} onchange="chat['${date}'][${i}].p.weights[${j}].kg=+this.value"> kg</div></div>`);
+    p.sleeps.forEach(x=>h+=`<div class="row"><div class="n">${sleepTxt(x)}<small>${esc(x.note)}</small></div></div>`);
     if(p.meals.length+p.workouts.length+p.weights.length+p.sleeps.length)
       h+=m.done?`<div class="empty" style="margin-top:6px">${m.done===1?'✓ 已记录':'已取消'}</div>`
       :`<div class="btns"><button class="btn" onclick="fin(${i},2)">取消</button><button class="btn p" onclick="fin(${i},1)">确认记录</button></div>`;
@@ -168,13 +173,13 @@ async function send(){
     L.pop();L.push({p})}catch(e){L.pop();L.push({err:'出错：'+e.message})}
   $('#send').disabled=false;drawChat()}
 function chart(data,y,m,mode){
-  const n=new Date(y,m,0).getDate(),key={w:'weight',i:'intake',b:'burn'}[mode],pts=[];
+  const n=new Date(y,m,0).getDate(),key={w:'weight',i:'intake',b:'burn',s:'sleep'}[mode],pts=[];
   for(let i=1;i<=n;i++){const k=`${calMonth}-${String(i).padStart(2,'0')}`,v=data[k]&&data[k][key];if(v)pts.push({i,v,k})}
   if(!pts.length)return `<div class="card empty" style="text-align:center">本月还没有数据</div>`;
-  const W=340,H=220,L=40,R=10,T=18,B=24,vs=pts.map(p=>p.v),last=vs[vs.length-1],col=mode==='b'?'var(--or)':'var(--ac)';
+  const W=340,H=220,L=40,R=10,T=18,B=24,vs=pts.map(p=>p.v),last=vs[vs.length-1],col=mode==='b'?'var(--or)':mode==='s'?'#3b82f6':'var(--ac)';
   let lo=Math.min(...vs),hi=Math.max(...vs);
   if(mode==='w'){const pad=Math.max((hi-lo)*.3,.5);lo-=pad;hi+=pad}else{lo=0;hi*=1.15}
-  const X=i=>L+(i-.5)*(W-L-R)/n,Y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo)),fmt=v=>mode==='w'?v.toFixed(1):Math.round(v);
+  const X=i=>L+(i-.5)*(W-L-R)/n,Y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo)),fmt=v=>mode==='w'?v.toFixed(1):mode==='s'?(v/60).toFixed(1):Math.round(v);
   let s=`<svg class="ch" viewBox="0 0 ${W} ${H}">`;
   for(let k=0;k<4;k++){const v=lo+(hi-lo)*k/3;s+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--bd)"/><text x="${L-5}" y="${Y(v)+3}" text-anchor="end" font-size="10" fill="var(--sub)">${fmt(v)}</text>`}
   [1,5,10,15,20,25,30].filter(d=>d<=n).forEach(d=>s+=`<text x="${X(d)}" y="${H-7}" text-anchor="middle" font-size="10" fill="var(--sub)">${d}</text>`);
@@ -188,17 +193,19 @@ function chart(data,y,m,mode){
     pts.forEach(p=>s+=`<rect x="${X(p.i)-bw/2}" y="${Y(p.v)}" width="${bw}" height="${H-B-Y(p.v)}" rx="3" fill="${col}" ${go_(p)}/>`);
   }
   const sum=vs.reduce((a,b)=>a+b,0),dlt=last-vs[0];
-  const info=mode==='w'?`最新 ${fmt(last)} kg · 本月 ${dlt>=0?'+':''}${dlt.toFixed(1)} kg`:`日均 ${Math.round(sum/vs.length)} · 共 ${Math.round(sum)} kcal`;
-  return `<div class="card"><div class="sec">${{w:'体重变化',i:'每日摄入',b:'每日运动消耗'}[mode]}<em>${info}</em></div>${s}</svg><div class="empty" style="text-align:center">点击数据点或柱子可跳到当天</div></div>`}
+  const info=mode==='w'?`最新 ${fmt(last)} kg · 本月 ${dlt>=0?'+':''}${dlt.toFixed(1)} kg`
+    :mode==='s'?`日均 ${(sum/vs.length/60).toFixed(1)} h · 共 ${pts.length} 天`
+    :`日均 ${Math.round(sum/vs.length)} · 共 ${Math.round(sum)} kcal`;
+  return `<div class="card"><div class="sec">${{w:'体重变化',i:'每日摄入',b:'每日运动消耗',s:'每日睡眠时长'}[mode]}<em>${info}</em></div>${s}</svg><div class="empty" style="text-align:center">点击数据点或柱子可跳到当天</div></div>`}
 async function renderCal(){
   const data=await api('month?month='+calMonth),[y,m]=calMonth.split('-').map(Number);
-  const seg=`<div class="seg">`+[['c','日历'],['w','体重'],['i','摄入'],['b','运动']].map(([k,l])=>`<button class="${calMode===k?'on':''}" onclick="calMode='${k}';render()">${l}</button>`).join('')+`</div>`;
+  const seg=`<div class="seg">`+[['c','日历'],['w','体重'],['i','摄入'],['b','运动'],['s','睡眠']].map(([k,l])=>`<button class="${calMode===k?'on':''}" onclick="calMode='${k}';render()">${l}</button>`).join('')+`</div>`;
   if(calMode!=='c'){$('#main').innerHTML=seg+chart(data,y,m,calMode);return}
   const first=(new Date(y,m-1,1).getDay()+6)%7,n=new Date(y,m,0).getDate(),td=ymd(new Date());
   let h=seg+'<div class="cal">'+[...'一二三四五六日'].map(x=>`<div class="wd">${x}</div>`).join('')+'<i></i>'.repeat(first);
   for(let i=1;i<=n;i++){const k=`${calMonth}-${String(i).padStart(2,'0')}`,v=data[k];
-    h+=`<button class="${k===td?'t':''} ${v?'has':''}" onclick="date='${k}';go('day')">${i}${v&&v.intake?`<small>${v.intake}</small>`:''}${v&&v.burn?`<small class="b">-${v.burn}</small>`:''}${v&&v.weight?`<small class="g">${v.weight}</small>`:''}</button>`}
-  $('#main').innerHTML=h+'</div><p class="empty" style="text-align:center;margin-top:14px">绿色：摄入 kcal　橙色：运动消耗 kcal　蓝色：体重 kg　点日期查看详情</p>'}
+    h+=`<button class="${k===td?'t':''} ${v?'has':''}" onclick="date='${k}';go('day')">${i}${v&&v.intake?`<small>${v.intake}</small>`:''}${v&&v.burn?`<small class="b">-${v.burn}</small>`:''}${v&&v.weight?`<small class="g">${v.weight}</small>`:''}${v&&v.sleep?`<small class="s">😴${(v.sleep/60).toFixed(1)}h</small>`:''}</button>`}
+  $('#main').innerHTML=h+'</div><p class="empty" style="text-align:center;margin-top:14px">绿色：摄入 kcal　橙色：运动消耗 kcal　蓝色：体重 kg　😴：睡眠时长　点日期查看详情</p>'}
 async function renderSet(){
   profile=await api('profile');const p=profile;
   const f=(id,l,t,v,x='')=>`<label>${l}</label><input class="f" id="f-${id}" type="${t}" ${x} value="${v??''}">`;

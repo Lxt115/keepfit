@@ -105,6 +105,19 @@ def day(date: str):
     return {"meals": meals, "workouts": works, "weights": weights, "sleeps": sleeps, "intake": round(intake), "burn": round(burn), **budget(burn)}
 
 
+def sleep_minutes(sleep_time, wake_time):
+    """计算睡眠时长（分钟），跨零点自动加一天；缺任一时间返回 0"""
+    if not sleep_time or not wake_time:
+        return 0
+    try:
+        a = dt.datetime.strptime(sleep_time, "%H:%M")
+        b = dt.datetime.strptime(wake_time, "%H:%M")
+    except ValueError:
+        return 0
+    m = int((b - a).total_seconds() // 60)
+    return m + 1440 if m < 0 else m
+
+
 @app.get("/api/month")
 def month(month: str):  # YYYY-MM
     like = month + "%"
@@ -113,11 +126,18 @@ def month(month: str):  # YYYY-MM
             SELECT date, kcal i, 0 b FROM meals WHERE date LIKE ? UNION ALL
             SELECT date, 0, kcal FROM workouts WHERE date LIKE ?) GROUP BY date""", (like, like)).fetchall()
         ws = c.execute("SELECT date, kg FROM weights WHERE date LIKE ? ORDER BY id", (like,)).fetchall()
-    out = {r["date"]: {"intake": round(r["i"] or 0), "burn": round(r["b"] or 0), "weight": None} for r in rows}
+        ss = c.execute("SELECT date, sleep_time, wake_time FROM sleeps WHERE date LIKE ? ORDER BY id", (like,)).fetchall()
+    out = {r["date"]: {"intake": round(r["i"] or 0), "burn": round(r["b"] or 0), "weight": None, "sleep": None} for r in rows}
     for w in ws:  # 同一天多次称重取最后一次
-        out.setdefault(w["date"], {"intake": 0, "burn": 0, "weight": None})["weight"] = w["kg"]
+        out.setdefault(w["date"], {"intake": 0, "burn": 0, "weight": None, "sleep": None})["weight"] = w["kg"]
+    for s in ss:  # 同一天多条睡眠累加时长（分钟）
+        m = sleep_minutes(s["sleep_time"], s["wake_time"])
+        if m:
+            d = out.setdefault(s["date"], {"intake": 0, "burn": 0, "weight": None, "sleep": None})
+            d["sleep"] = (d["sleep"] or 0) + m
     for v in out.values():
         v.setdefault("weight", None)
+        v.setdefault("sleep", None)
     return out
 
 
@@ -141,7 +161,7 @@ SYSTEM = """你是饮食与运动记录助手。把用户消息拆分成结构�
 4. 运动：每个动作/项目单独一条，name为项目名，detail保留用户原始数据（时长/组数x次数/重量），kcal按体重{weight}kg估算该项目消耗；力量训练考虑组数、次数、重量和间歇；辅助引体向上的重量是辅助重量。
 5. 用户发的图片如果是食物就识别并估算；如果是营养成分表就按表计算。
 6. 体重：用户提到称重/体重数值时记入weights（kg，一天可多次），不要估算体重。
-7. 作息：入睡/起床时间记入sleeps。“刚起床”=wake_time取现在时间；“昨晚11点半睡的”=sleep_time为23:30；只知其一时另一个填空字符串；note只写用户提到的睡眠情况。体重和作息仅作记录，不影响热量计算；同一条消息可同时包含饮食、运动、体重、作息。
+7. 作息：入睡/起床时间记入sleeps，每条sleeps代表一段睡眠。“昨晚11点半睡的”=sleep_time为23:30；“刚起床”=wake_time取现在时间；只知其一时另一个填空字符串。午休单独记一条（如“中午睡了半小时”=sleep_time为13:00、wake_time为13:30，按用户描述的时间或默认13:00-13:30）。note只写用户提到的睡眠情况。作息不影响热量计算；同一条消息可同时包含饮食、运动、体重、作息。
 8. 无法判断时所有数组留空，并在reply里提问。"""
 
 
