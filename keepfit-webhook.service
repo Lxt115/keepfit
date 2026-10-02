@@ -1,0 +1,15 @@
+[Unit]
+Description=Keepfit webhook (GitHub auto deploy)
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/keepfit
+ExecStart=/home/ubuntu/keepfit/webhook -verbose -hooks=/home/ubuntu/keepfit/hooks.json -hotreload
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
