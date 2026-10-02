@@ -11,7 +11,10 @@ services:
       - ./data:/data
 
   webhook:
-    image: almir/webhook
+    build:
+      context: .
+      dockerfile: Dockerfile.webhook
+    image: keepfit-webhook:latest
     container_name: keepfit-webhook
     restart: unless-stopped
     command: ["-verbose", "-hooks=/etc/webhook/hooks.json", "-hotreload"]

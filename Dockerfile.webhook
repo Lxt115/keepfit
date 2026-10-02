@@ -1,0 +1,4 @@
+FROM almir/webhook
+
+# webhook 容器需要 git 拉取代码、docker CLI 重建容器
+RUN apk add --no-cache git docker-cli docker-cli-compose
