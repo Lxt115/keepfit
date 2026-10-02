@@ -9,3 +9,15 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/data
+
+  webhook:
+    image: almir/webhook
+    container_name: keepfit-webhook
+    restart: unless-stopped
+    command: ["-verbose", "-hooks=/etc/webhook/hooks.json", "-hotreload"]
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./hooks.json:/etc/webhook/hooks.json:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/home/ubuntu/keepfit
