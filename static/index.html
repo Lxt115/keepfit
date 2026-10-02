@@ -209,7 +209,7 @@ async function renderCal(){
   let h=seg+'<div class="cal">'+[...'一二三四五六日'].map(x=>`<div class="wd">${x}</div>`).join('')+'<i></i>'.repeat(first);
   for(let i=1;i<=n;i++){const k=`${calMonth}-${String(i).padStart(2,'0')}`,v=data[k];
     h+=`<button class="${k===td?'t':''} ${v?'has':''}" onclick="date='${k}';go('day')">${i}${v&&v.intake?`<small>${v.intake}</small>`:''}${v&&v.burn?`<small class="b">-${v.burn}</small>`:''}${v&&v.weight?`<small class="g">${v.weight}</small>`:''}${v&&v.sleep?`<small class="s">😴${(v.sleep/60).toFixed(1)}h</small>`:''}</button>`}
-  $('#main').innerHTML=h+'</div><p class="empty" style="text-align:center;margin-top:14px">绿色：摄入 kcal　橙色：运动消耗 kcal　蓝色：体重 kg　😴：睡眠时长　点日期查看详情</p>'}
+  $('#main').innerHTML=h+'</div>'}
 async function renderSet(){
   profile=await api('profile');const p=profile;
   const f=(id,l,t,v,x='')=>`<label>${l}</label><input class="f" id="f-${id}" type="${t}" ${x} value="${v??''}">`;
