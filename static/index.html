@@ -97,7 +97,6 @@ function sleepTxt(s){
   if(s.sleep_time&&s.wake_time)t+=' · '+dur(s.sleep_time,s.wake_time);
   return t}
 const MI={'早餐':'🌅','午餐':'🍱','晚餐':'🌙','加餐':'🍎'};
-const EX=['我刚起床，吃了一个拳头大小的无糖面包','晚上吃了一根香蕉，100kcal','1001健身记录\n羽毛球 1h\n高位下拉 4x12 20kg'];
 let token=localStorage.t||'',date=ymd(new Date()),view='day',imgs=[],chat={},profile={},calMonth=date.slice(0,7),calMode='c';
 async function api(p,o={}){
   const r=await fetch('api/'+p,{method:o.method||'GET',headers:{'Content-Type':'application/json','X-Token':token},body:o.body&&JSON.stringify(o.body)});
@@ -141,10 +140,9 @@ async function renderDay(){
   $('#main').innerHTML=h;drawChat()}
 function fold(el){el.closest('.card').classList.toggle('fold')}
 async function del(k,id){if(confirm('删除这条记录？')){await api(k+'/'+id,{method:'DELETE'});render()}}
-function ex(i){$('#txt').value=EX[i];$('#txt').focus()}
 function drawChat(){
   const el=$('#chat');if(!el)return;const L=chat[date]||[];
-  if(!L.length){el.innerHTML=`<div class="chips">`+EX.map((e,i)=>`<button class="chip" onclick="ex(${i})">${esc(e.split('\n')[0])}</button>`).join('')+`</div>`;return}
+  if(!L.length){el.innerHTML='';return}
   el.innerHTML=L.map((m,i)=>{
     if(m.me!==undefined)return `<div class="me">${esc(m.me)}${m.n?` 📷×${m.n}`:''}</div>`;
     if(m.err)return `<div class="card bot ${m.load?'':'err'}">${esc(m.err)}</div>`;
