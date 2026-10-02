@@ -1,8 +1,14 @@
 [
   {
     "id": "keepfit-deploy",
-    "execute-command": "/home/ubuntu/keepfit/deploy.sh",
+    "execute-command": "sh",
     "command-working-directory": "/home/ubuntu/keepfit",
+    "pass-arguments-to-command": [
+      {
+        "source": "string",
+        "name": "deploy.sh"
+      }
+    ],
     "response-message": "deploy triggered",
     "trigger-rule": {
       "match": {
