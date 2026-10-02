@@ -7,7 +7,7 @@
 :root{--bg:#f3f6f4;--card:#fff;--tx:#18211d;--sub:#8a958f;--ac:#10b981;--ac2:#059669;--or:#f97316;--rd:#ef4444;--bd:#e6ece8;--sh:0 4px 18px rgba(16,60,40,.07)}
 @media(prefers-color-scheme:dark){:root{--bg:#0f1512;--card:#19211d;--tx:#e9f0ec;--sub:#86928c;--bd:#26312b;--sh:none}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;margin:0}
+html,body{height:100%;margin:0;overflow-x:hidden}
 body{font:15px/1.5 -apple-system,"PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--tx);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
 button{font:inherit;cursor:pointer;color:inherit}
 svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -58,17 +58,18 @@ main{flex:1;min-height:0;overflow-y:auto;padding:6px 16px 16px}
 nav{display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom)}
 nav button{flex:1;border:0;background:none;padding:8px 0 6px;color:var(--sub);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px}
 nav button.on{color:var(--ac)}
-.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
 .cal .wd{text-align:center;font-size:12px;color:var(--sub);padding:4px 0}
-.cal button{aspect-ratio:1/1.15;border:0;border-radius:14px;background:var(--card);box-shadow:var(--sh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-weight:600;padding:0}
-.cal button small{font-size:10px;color:var(--ac);font-weight:500;line-height:1.1}.cal button small.b{color:var(--or)}.cal button small.g{color:#3b82f6}.cal button small.s{color:#8b5cf6}
+.cal button{aspect-ratio:1/1.15;min-width:0;overflow:hidden;border:0;border-radius:14px;background:var(--card);box-shadow:var(--sh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-weight:600;padding:0}
+.cal button small{font-size:10px;color:var(--ac);font-weight:500;line-height:1.1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cal button small.b{color:var(--or)}.cal button small.g{color:#3b82f6}.cal button small.s{color:#8b5cf6}
 .cal button.t{outline:2px solid var(--ac)}.cal button.has{background:linear-gradient(180deg,var(--card),rgba(16,185,129,.12))}
 .cal i{visibility:hidden}
 label{display:block;margin:14px 0 4px;color:var(--sub);font-size:13px}
 .f{width:100%;padding:12px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);color:var(--tx);font:inherit}
 .err{color:var(--rd)}
-.seg{display:flex;background:var(--card);border-radius:14px;padding:3px;box-shadow:var(--sh);margin-bottom:12px}
-.seg button{flex:1;border:0;background:none;padding:8px 0;border-radius:11px;font-size:14px;color:var(--sub)}
+.seg{display:flex;background:var(--card);border-radius:14px;padding:3px;box-shadow:var(--sh);margin-bottom:12px;overflow-x:auto;scrollbar-width:none}
+.seg::-webkit-scrollbar{display:none}
+.seg button{flex:1 0 auto;white-space:nowrap;border:0;background:none;padding:8px 10px;border-radius:11px;font-size:14px;color:var(--sub)}
 .seg button.on{background:var(--ac);color:#fff;font-weight:600}
 svg.ch{width:100%;height:auto;margin-top:6px}
 </style></head><body>
