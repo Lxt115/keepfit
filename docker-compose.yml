@@ -1,0 +1,11 @@
+services:
+  keepfit:
+    build: .
+    image: keepfit:latest
+    container_name: keepfit
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
