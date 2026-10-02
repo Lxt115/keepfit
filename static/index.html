@@ -14,7 +14,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke
 header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 6px}
 header h1{margin:0;font-size:20px;text-align:center;line-height:1.2}header small{display:block;font-size:12px;color:var(--sub);font-weight:400}
 .rb{width:36px;height:36px;border-radius:50%;border:0;background:var(--card);box-shadow:var(--sh);font-size:18px}
-main{flex:1;overflow-y:auto;padding:6px 16px 16px}
+main{flex:1;min-height:0;overflow-y:auto;padding:6px 16px 16px}
 .card{background:var(--card);border-radius:18px;padding:14px 16px;margin:12px 0;box-shadow:var(--sh)}
 .hero{background:linear-gradient(135deg,#10b981,#0d9488);color:#fff;border-radius:24px;padding:18px;margin:8px 0 12px;display:flex;align-items:center;gap:16px;box-shadow:0 10px 26px rgba(16,185,129,.3)}
 .hero.over{background:linear-gradient(135deg,#f97316,#ef4444);box-shadow:0 10px 26px rgba(239,68,68,.28)}
@@ -50,7 +50,7 @@ main{flex:1;overflow-y:auto;padding:6px 16px 16px}
 .btn.p{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border:0}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .chip{border:1px solid var(--bd);background:var(--card);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--sub)}
-#bar{display:flex;gap:8px;align-items:flex-end;margin:0 12px 8px;padding:6px 6px 6px 8px;background:var(--card);border-radius:26px;box-shadow:0 6px 24px rgba(16,60,40,.14)}
+#bar{display:flex;gap:8px;align-items:flex-end;margin:0 12px 8px;padding:6px 6px 6px 8px;background:var(--card);border-radius:26px;box-shadow:0 6px 24px rgba(16,60,40,.14);flex:none}
 #bar textarea{flex:1;resize:none;max-height:110px;border:0;outline:0;background:none;color:var(--tx);font:inherit;padding:8px 2px}
 .ib{width:40px;height:40px;border-radius:50%;border:0;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--sub);flex:none}
 .ib.s{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff}.ib:disabled{opacity:.5}
@@ -116,7 +116,7 @@ async function render(){
     if(view==='day'){
       const dd=new Date(date+'T00:00');
       $('#title').innerHTML=dd.toLocaleDateString('zh-CN',{month:'long',day:'numeric'})+`<small>${dd.toLocaleDateString('zh-CN',{weekday:'long'})}${date===ymd(new Date())?' · 今天':''}</small>`;
-      await renderDay()}
+      await renderDay();$('#main').scrollTop=0}
     else if(view==='cal'){const[y,m]=calMonth.split('-');$('#title').innerHTML=`${y}年${+m}月`;await renderCal()}
     else{$('#title').innerHTML='我的目标';await renderSet()}
   }catch(e){$('#main').innerHTML=`<div class="card err">出错了：${esc(e.message)}</div>`}}
