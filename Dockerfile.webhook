@@ -1,4 +1,12 @@
-FROM almir/webhook
+FROM alpine:3.20
 
-# webhook 容器需要 git 拉取代码、docker CLI 重建容器
-RUN apk add --no-cache git docker-cli docker-cli-compose
+# 安装 webhook、git、docker CLI
+RUN apk add --no-cache git docker-cli docker-cli-compose curl \
+    && curl -fsSL https://github.com/adnanh/webhook/releases/download/2.8.3/webhook-linux-amd64.tar.gz \
+       | tar -xz -C /tmp \
+    && mv /tmp/webhook-linux-amd64/webhook /usr/local/bin/webhook \
+    && rm -rf /tmp/webhook-linux-amd64
+
+EXPOSE 9000
+
+ENTRYPOINT ["/usr/local/bin/webhook"]
