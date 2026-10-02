@@ -1,7 +1,7 @@
 [
   {
     "id": "keepfit-deploy",
-    "execute-command": "sh",
+    "execute-command": "/bin/sh",
     "command-working-directory": "/home/ubuntu/keepfit",
     "pass-arguments-to-command": [
       {
