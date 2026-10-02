@@ -1,4 +1,5 @@
 .env
+hooks.json
 data.db
 data/
 __pycache__/
