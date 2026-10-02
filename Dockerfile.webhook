@@ -1,12 +1,8 @@
 FROM alpine:3.20
 
-# 安装 webhook、git、docker CLI
-RUN apk add --no-cache git docker-cli docker-cli-compose curl \
-    && curl -fsSL https://github.com/adnanh/webhook/releases/download/2.8.3/webhook-linux-amd64.tar.gz \
-       | tar -xz -C /tmp \
-    && mv /tmp/webhook-linux-amd64/webhook /usr/local/bin/webhook \
-    && rm -rf /tmp/webhook-linux-amd64
+# 安装 webhook、git、docker CLI（全部走 apk，避免访问 GitHub 下载）
+RUN apk add --no-cache git docker-cli docker-cli-compose webhook
 
 EXPOSE 9000
 
-ENTRYPOINT ["/usr/local/bin/webhook"]
+ENTRYPOINT ["/usr/bin/webhook"]
