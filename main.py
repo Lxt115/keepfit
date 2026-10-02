@@ -162,7 +162,10 @@ SYSTEM = """你是饮食与运动记录助手。把用户消息拆分成结构�
 5. 用户发的图片如果是食物就识别并估算；如果是营养成分表就按表计算。
 6. 体重：用户提到称重/体重数值时记入weights（kg，一天可多次），不要估算体重。
 7. 作息：入睡/起床时间记入sleeps，每条sleeps代表一段睡眠。“昨晚11点半睡的”=sleep_time为23:30；“刚起床”=wake_time取现在时间；只知其一时另一个填空字符串。午休单独记一条（如“中午睡了半小时”=sleep_time为13:00、wake_time为13:30，按用户描述的时间或默认13:00-13:30）。note只写用户提到的睡眠情况。作息不影响热量计算；同一条消息可同时包含饮食、运动、体重、作息。
-8. 无法判断时所有数组留空，并在reply里提问。"""
+8. 无法判断时所有数组留空，并在reply里提问。
+9. 引用历史：用户说“和昨天/前天/某天吃的一样”“照旧”“同上”等时，从下方【历史饮食记录】中找到对应日期的饮食，原样复制其name、amount、kcal（meal_type、time可沿用原记录），date用用户当前要记录的日期（默认查看日期）。历史里没有对应日期时不要编造，在reply里说明并追问。
+【历史饮食记录】
+{history}"""
 
 
 class ParseIn(BaseModel):
@@ -173,10 +176,26 @@ class ParseIn(BaseModel):
     now: str
 
 
+def meal_history(days: int = 7) -> str:
+    """最近若干天的饮食记录，供模型处理“和昨天吃的一样”等引用"""
+    with closing(db()) as c:
+        rows = c.execute("SELECT date,time,meal_type,name,amount,kcal FROM meals ORDER BY date DESC,time,id").fetchall()
+    by_date = {}
+    for r in rows:
+        by_date.setdefault(r["date"], []).append(r)
+    lines = []
+    for d in sorted(by_date, reverse=True)[:days]:
+        items = "；".join(f'{r["meal_type"]} {r["name"]} {r["amount"] or ""} {round(r["kcal"] or 0)}kcal'.strip()
+                          for r in by_date[d])
+        lines.append(f"{d}: {items}")
+    return "\n".join(lines) if lines else "（暂无历史记录）"
+
+
 @app.post("/api/parse")
 def parse(b: ParseIn):
     p = get_profile() or {}
-    sys = SYSTEM.format(today=b.today, now=b.now, date=b.date, weight=p.get("weight_kg", 65))
+    sys = SYSTEM.format(today=b.today, now=b.now, date=b.date, weight=p.get("weight_kg", 65),
+                        history=meal_history())
     content = [{"type": "text", "text": b.text or "（见图片）"}]
     content += [{"type": "image_url", "image_url": {"url": u}} for u in b.images]
     try:
