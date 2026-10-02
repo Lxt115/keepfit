@@ -62,11 +62,11 @@ def profile_get():
 @app.post("/api/profile")
 def profile_set(p: Profile):
     try:
-        ok = dt.date.fromisoformat(p.target_date) > dt.date.today()
+        ok = dt.date.fromisoformat(p.target_date) >= dt.date.today()
     except ValueError:
         ok = False
     if not ok:
-        raise HTTPException(400, "目标日期必须晚于今天")
+        raise HTTPException(400, "目标日期不能早于今天")
     with closing(db()) as c:
         c.execute("REPLACE INTO profile VALUES(1,?,?,?,?,?,?)",
                   (p.sex, p.age, p.height_cm, p.weight_kg, p.target_weight_kg, p.target_date))
