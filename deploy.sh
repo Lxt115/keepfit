@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 echo "[deploy] $(date '+%Y-%m-%d %H:%M:%S') 开始部署"
 
 # 拉取最新代码（强制与远程一致，避免本地改动冲突）
-git fetch origin main
+timeout 120 git fetch origin main
 git reset --hard origin/main
 
 # 重建并重启容器

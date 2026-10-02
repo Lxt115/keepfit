@@ -7,6 +7,8 @@ Requires=docker.service
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/keepfit
+Environment=HOME=/home/ubuntu
+Environment=GIT_TERMINAL_PROMPT=0
 ExecStart=/home/ubuntu/keepfit/webhook -verbose -hooks=/home/ubuntu/keepfit/hooks.json -hotreload
 Restart=always
 RestartSec=5
