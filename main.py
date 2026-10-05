@@ -3,7 +3,7 @@ from contextlib import closing
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from openai import OpenAI
+from openai import OpenAI, APITimeoutError
 
 DB = os.getenv("DB_PATH", "data.db")
 TOKEN = os.getenv("APP_TOKEN", "")
@@ -237,9 +237,11 @@ def parse(b: ParseIn):
     content += [{"type": "image_url", "image_url": {"url": u}} for u in b.images]
     try:
         r = client.chat.completions.create(
-            model=MODEL, response_format={"type": "json_object"},
+            model=MODEL, response_format={"type": "json_object"}, timeout=10, max_retries=0,
             messages=[{"role": "system", "content": sys}, {"role": "user", "content": content}])
         data = json.loads(r.choices[0].message.content)
+    except APITimeoutError:
+        raise HTTPException(504, "模型响应超时（10s），请重试")
     except Exception as e:
         raise HTTPException(502, f"模型调用/解析失败: {e}")
     data.setdefault("date", b.date)

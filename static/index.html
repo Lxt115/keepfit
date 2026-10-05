@@ -127,7 +127,11 @@ function sleepTxt(s){
 const MI={'早餐':'🌅','午餐':'🍱','晚餐':'🌙','加餐':'🍎'};
 let token=localStorage.t||'',date=ymd(new Date()),view='day',imgs=[],chat={},profile={},calMonth=date.slice(0,7),calMode='c';
 async function api(p,o={}){
-  const r=await fetch('api/'+p,{method:o.method||'GET',headers:{'Content-Type':'application/json','X-Token':token},body:o.body&&JSON.stringify(o.body)});
+  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),12000);
+  let r;
+  try{r=await fetch('api/'+p,{method:o.method||'GET',headers:{'Content-Type':'application/json','X-Token':token},body:o.body&&JSON.stringify(o.body),signal:ac.signal})}
+  catch(e){throw new Error(e.name==='AbortError'?'请求超时（12s），请重试':e.message)}
+  finally{clearTimeout(tm)}
   if(r.status==401){token=prompt('访问口令')||'';localStorage.t=token;return api(p,o)}
   if(!r.ok)throw new Error((await r.text()).slice(0,200));return r.json()}
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
