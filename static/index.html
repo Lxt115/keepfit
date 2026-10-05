@@ -129,14 +129,20 @@ function sleepTxt(s){
   return h||'—'}
 const MI={'早餐':'🌅','午餐':'🍱','晚餐':'🌙','加餐':'🍎'};
 let token=localStorage.t||'',date=ymd(new Date()),view='day',imgs=[],chat={},profile={},calMonth=date.slice(0,7),calMode='c';
+const cache={};  // GET 请求缓存：key -> 数据，用于切换标签时秒开
 async function api(p,o={}){
+  const method=o.method||'GET',key=method==='GET'?p:null;
   const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),12000);
   let r;
-  try{r=await fetch('api/'+p,{method:o.method||'GET',headers:{'Content-Type':'application/json','X-Token':token},body:o.body&&JSON.stringify(o.body),signal:ac.signal})}
+  try{r=await fetch('api/'+p,{method,headers:{'Content-Type':'application/json','X-Token':token},body:o.body&&JSON.stringify(o.body),signal:ac.signal})}
   catch(e){throw new Error(e.name==='AbortError'?'请求超时（12s），请重试':e.message)}
   finally{clearTimeout(tm)}
-  if(r.status==401){token=prompt('访问口令')||'';localStorage.t=token;return api(p,o)}
-  if(!r.ok)throw new Error((await r.text()).slice(0,200));return r.json()}
+  if(r.status===401){token=prompt('访问口令')||'';localStorage.t=token;return api(p,o)}
+  if(!r.ok)throw new Error((await r.text()).slice(0,200));
+  const data=await r.json();
+  if(key)cache[key]=data;  // 写请求后清空缓存，保证数据新鲜
+  else Object.keys(cache).forEach(k=>delete cache[k]);
+  return data}
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function go(v){view=v;render()}
 function shift(n){
@@ -156,7 +162,10 @@ async function render(){
     else{$('#title').innerHTML=`<span class="brand">keepfit</span><small>我的目标</small>`;await renderSet()}
   }catch(e){$('#main').innerHTML=`<div class="card err">出错了：${esc(e.message)}</div>`}}
 async function renderDay(){
-  const d=await api('day?date='+date);
+  const key='day?date='+date;
+  if(cache[key])drawDay(cache[key]);  // 有缓存先秒开
+  const d=await api(key);drawDay(d)}
+function drawDay(d){
   const bud=d.budget,left=bud!=null?bud-d.intake:null,over=left!=null&&left<0,pct=bud?Math.min(d.intake/bud,1):0,C=2*Math.PI*54;
   let h=`<section class="hero ${over?'over':''}"><div class="ring"><svg viewBox="0 0 128 128"><circle class="tr" cx="64" cy="64" r="54"/><circle class="pg" cx="64" cy="64" r="54" style="stroke-dasharray:${C*pct} ${C}"/></svg>
   <div class="mid"><b>${left==null?'-':Math.abs(left)}</b><span>${over?'已超出 kcal':'还可摄入 kcal'}</span></div></div>
@@ -244,7 +253,11 @@ function chart(data,y,m,mode){
     :`日均 ${Math.round(sum/vs.length)} · 共 ${Math.round(sum)} kcal`;
   return `<div class="card"><div class="sec">${{w:'体重变化',i:'每日摄入',b:'每日运动消耗',s:'每日睡眠时长'}[mode]}<em>${info}</em></div>${s}</svg><div class="empty" style="text-align:center">点击数据点或柱子可跳到当天</div></div>`}
 async function renderCal(){
-  const data=await api('month?month='+calMonth),[y,m]=calMonth.split('-').map(Number);
+  const key='month?month='+calMonth;
+  if(cache[key])drawCal(cache[key]);  // 有缓存先秒开
+  const data=await api(key);drawCal(data)}
+function drawCal(data){
+  const[y,m]=calMonth.split('-').map(Number);
   const seg=`<div class="seg">`+[['c','日历'],['w','体重'],['i','摄入'],['b','运动'],['s','睡眠']].map(([k,l])=>`<button class="${calMode===k?'on':''}" onclick="calMode='${k}';render()">${l}</button>`).join('')+`</div>`;
   if(calMode!=='c'){$('#main').innerHTML=seg+chart(data,y,m,calMode);return}
   const first=(new Date(y,m-1,1).getDay()+6)%7,n=new Date(y,m,0).getDate(),td=ymd(new Date());
@@ -255,7 +268,9 @@ async function renderCal(){
     h+=`<button class="${k===td?'t':''} ${v?'has':''}" onclick="date='${k}';go('day')">${i}${net}</button>`}
   $('#main').innerHTML=h+'</div>'}
 async function renderSet(){
-  profile=await api('profile');const p=profile;
+  if(cache.profile)drawSet(cache.profile);  // 有缓存先秒开
+  profile=await api('profile');drawSet(profile)}
+function drawSet(p){
   const f=(id,l,t,v,x='')=>`<label>${l}</label><input class="f" id="f-${id}" type="${t}" ${x} value="${v??''}">`;
   const est=Math.round(10*(p.weight_kg||0)+6.25*(p.height_cm||0)-5*(p.age||0)+(p.sex==='female'?-161:5));
   $('#main').innerHTML=`<div class="card"><label style="margin-top:0">性别</label><select class="f" id="f-sex"><option value="male">男</option><option value="female">女</option></select>

@@ -84,9 +84,9 @@ def profile_set(p: Profile):
     return {"ok": True}
 
 
-def bmr_value():
+def bmr_value(p=None):
     """基础代谢率：优先用档案里手填的 bmr，否则按 Mifflin-St Jeor 公式估算（体重优先取最近一次称重）"""
-    p = get_profile()
+    p = p or get_profile()
     if not p:
         return 0
     with closing(db()) as c:
@@ -95,15 +95,15 @@ def bmr_value():
     return p["bmr"] or (10 * weight + 6.25 * p["height_cm"] - 5 * p["age"] + (5 if p["sex"] == "male" else -161))
 
 
-def budget(burn):
+def budget(burn, p=None):
     """基础代谢*1.2(久坐系数,运动单独记) - 为达成目标每日需要的热量缺口 + 运动消耗"""
-    p = get_profile()
+    p = p or get_profile()
     if not p:
         return {}
     with closing(db()) as c:
         r = c.execute("SELECT kg FROM weights ORDER BY date DESC, id DESC LIMIT 1").fetchone()
     weight = r["kg"] if r else p["weight_kg"]  # 优先用最近一次称重
-    bmr = bmr_value()
+    bmr = bmr_value(p)
     base = bmr * 1.2
     try:
         days = max((dt.date.fromisoformat(p["target_date"]) - dt.date.today()).days, 1)
@@ -278,6 +278,15 @@ def commit(b: Commit):
                        x.get("nap_sleep_time"), x.get("nap_wake_time"), x.get("note")))
         c.commit()
     return {"ok": True}
+
+
+@app.middleware("http")
+async def cache_static(request, call_next):
+    """静态资源加缓存头，减少公网重复下载；API 响应不缓存"""
+    r = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        r.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
+    return r
 
 
 app.mount("/", StaticFiles(directory="static", html=True))
