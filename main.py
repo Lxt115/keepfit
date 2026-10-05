@@ -1,4 +1,4 @@
-import os, json, sqlite3, datetime as dt
+import os, json, sqlite3, datetime as dt, time
 from contextlib import closing
 from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.staticfiles import StaticFiles
@@ -239,6 +239,19 @@ def needs_history(text: str) -> bool:
     return any(k in text for k in HISTORY_HINTS)
 
 
+def call_model(msgs):
+    """调用模型；若首次请求超过 6s（多为冷连接/网络抖动）则自动重试一次"""
+    t = time.time()
+    try:
+        return client.chat.completions.create(
+            model=MODEL, response_format={"type": "json_object"}, timeout=60, messages=msgs)
+    except Exception:
+        if time.time() - t < 6:  # 快速失败（如参数错误）不重试
+            raise
+    return client.chat.completions.create(
+        model=MODEL, response_format={"type": "json_object"}, timeout=60, messages=msgs)
+
+
 @app.post("/api/parse")
 def parse(b: ParseIn):
     p = get_profile() or {}
@@ -253,9 +266,7 @@ def parse(b: ParseIn):
             msgs.append({"role": role, "content": h["content"]})
     msgs.append({"role": "user", "content": content})
     try:
-        r = client.chat.completions.create(
-            model=MODEL, response_format={"type": "json_object"}, timeout=60,
-            messages=msgs)
+        r = call_model(msgs)
         data = json.loads(r.choices[0].message.content)
     except APITimeoutError:
         raise HTTPException(504, "模型响应超时（60s），请重试")
