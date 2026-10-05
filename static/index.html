@@ -2,7 +2,7 @@
 <html lang="zh"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#10b981">
-<title>热量记录</title>
+<title>keepfit</title>
 <style>
 :root{--bg:#f3f6f4;--card:#fff;--tx:#18211d;--sub:#8a958f;--ac:#10b981;--ac2:#059669;--or:#f97316;--rd:#ef4444;--bd:#e6ece8;--sh:0 4px 18px rgba(16,60,40,.07)}
 @media(prefers-color-scheme:dark){:root{--bg:#0f1512;--card:#19211d;--tx:#e9f0ec;--sub:#86928c;--bd:#26312b;--sh:none}}
@@ -12,7 +12,7 @@ body{font:15px/1.5 -apple-system,"PingFang SC",system-ui,sans-serif;background:v
 button{font:inherit;cursor:pointer;color:inherit}
 svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 6px}
-header h1{margin:0;font-size:20px;text-align:center;line-height:1.2}header small{display:block;font-size:12px;color:var(--sub);font-weight:400}
+header h1{margin:0;font-size:20px;text-align:center;line-height:1.2}header small{display:block;font-size:12px;color:var(--sub);font-weight:400}header .brand{display:block;font-weight:700;letter-spacing:.5px}
 .rb{width:36px;height:36px;border-radius:50%;border:0;background:var(--card);box-shadow:var(--sh);font-size:18px}
 main{flex:1;min-height:0;overflow-y:auto;padding:6px 16px 16px}
 .card{background:var(--card);border-radius:18px;padding:14px 16px;margin:12px 0;box-shadow:var(--sh)}
@@ -43,7 +43,7 @@ main{flex:1;min-height:0;overflow-y:auto;padding:6px 16px 16px}
 .me{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff;border-radius:18px 18px 4px 18px;padding:9px 14px;margin:10px 0 10px auto;max-width:82%;width:fit-content;white-space:pre-wrap}
 .bot{border:1px solid var(--bd);border-radius:18px 18px 18px 4px;max-width:94%}
 .bot .why{font-size:13px;color:var(--sub);margin-bottom:4px}
-.bot input{width:68px;text-align:right;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);padding:4px 8px;font:inherit;font-weight:600}
+.bot input{width:68px;text-align:right;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx);padding:4px 8px;font:inherit;font-size:16px;font-weight:600}
 .warn{color:#d97706;font-size:13px}
 .btns{display:flex;gap:10px;margin-top:10px}
 .btn{flex:1;padding:11px;border-radius:14px;border:1px solid var(--bd);background:var(--bg);font-weight:600}
@@ -51,7 +51,7 @@ main{flex:1;min-height:0;overflow-y:auto;padding:6px 16px 16px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .chip{border:1px solid var(--bd);background:var(--card);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--sub)}
 #bar{display:flex;gap:8px;align-items:flex-end;margin:0 12px 8px;padding:6px 6px 6px 8px;background:var(--card);border-radius:26px;box-shadow:0 6px 24px rgba(16,60,40,.14);flex:none}
-#bar textarea{flex:1;resize:none;max-height:110px;border:0;outline:0;background:none;color:var(--tx);font:inherit;padding:8px 2px}
+#bar textarea{flex:1;resize:none;max-height:110px;border:0;outline:0;background:none;color:var(--tx);font:inherit;font-size:16px;padding:8px 2px}
 .ib{width:40px;height:40px;border-radius:50%;border:0;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--sub);flex:none}
 .ib.s{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#fff}.ib:disabled{opacity:.5}
 .badge{position:absolute;top:-4px;right:-4px;background:var(--or);color:#fff;border-radius:9px;font-size:10px;padding:0 5px}
@@ -61,19 +61,29 @@ nav button.on{color:var(--ac)}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
 .cal .wd{text-align:center;font-size:12px;color:var(--sub);padding:4px 0}
 .cal button{aspect-ratio:1/1.15;min-width:0;overflow:hidden;border:0;border-radius:14px;background:var(--card);box-shadow:var(--sh);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font-weight:600;font-size:13px;line-height:1.15;padding:0}
-.cal button small{font-size:8px;color:var(--ac);font-weight:500;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cal button small.b{color:var(--or)}.cal button small.g{color:#3b82f6}.cal button small.s{color:#8b5cf6}
+.cal button small{font-size:8px;color:var(--ac);font-weight:500;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cal button small.d{color:var(--ac)}.cal button small.u{color:var(--or)}
 .cal button.t{outline:2px solid var(--ac)}.cal button.has{background:linear-gradient(180deg,var(--card),rgba(16,185,129,.12))}
 .cal i{visibility:hidden}
 label{display:block;margin:14px 0 4px;color:var(--sub);font-size:13px}
-.f{width:100%;padding:12px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);color:var(--tx);font:inherit}
+.f{width:100%;padding:12px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);color:var(--tx);font:inherit;font-size:16px}
 .err{color:var(--rd)}
 .seg{display:flex;background:var(--card);border-radius:14px;padding:3px;box-shadow:var(--sh);margin-bottom:12px;overflow-x:auto;scrollbar-width:none}
 .seg::-webkit-scrollbar{display:none}
 .seg button{flex:1 0 auto;white-space:nowrap;border:0;background:none;padding:8px 10px;border-radius:11px;font-size:14px;color:var(--sub)}
 .seg button.on{background:var(--ac);color:#fff;font-weight:600}
 svg.ch{width:100%;height:auto;margin-top:6px}
+#modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.4);backdrop-filter:blur(2px)}
+#modal.on{display:flex}
+.dlg{width:100%;max-width:320px;background:var(--card);border-radius:22px;padding:22px 20px 16px;box-shadow:0 20px 50px rgba(0,0,0,.28);text-align:center;animation:pop .18s ease-out}
+@keyframes pop{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+.dlg .ic{width:52px;height:52px;margin:0 auto 12px;border-radius:50%;background:rgba(239,68,68,.12);color:var(--rd);display:flex;align-items:center;justify-content:center}
+.dlg .ic svg{width:26px;height:26px}
+.dlg h3{margin:0 0 6px;font-size:17px}
+.dlg p{margin:0 0 18px;font-size:13px;color:var(--sub);line-height:1.5}
+.dlg .btns{margin-top:0}
+.dlg .btn.d{background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;border:0}
 </style></head><body>
-<header><button class="rb" id="prev" onclick="shift(-1)">‹</button><h1 id="title"></h1><button class="rb" id="next" onclick="shift(1)">›</button></header>
+<header><button class="rb" id="prev" onclick="shift(-1)">‹</button><h1 id="title"><span class="brand">keepfit</span></h1><button class="rb" id="next" onclick="shift(1)">›</button></header>
 <main id="main"></main>
 <div id="bar">
  <button class="ib" style="position:relative" onclick="document.getElementById('file').click()"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span class="badge" id="nimg" hidden></span></button>
@@ -86,17 +96,34 @@ svg.ch{width:100%;height:auto;margin-top:6px}
  <button id="n-cal" onclick="go('cal')"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>日历</button>
  <button id="n-set" onclick="go('set')"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 5-6 8-6s7 2 8 6"/></svg>目标</button>
 </nav>
+<div id="modal" onclick="if(event.target===this)closeDlg()">
+ <div class="dlg">
+  <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg></div>
+  <h3>删除这条记录？</h3>
+  <p>删除后将无法恢复，确定要继续吗？</p>
+  <div class="btns"><button class="btn" onclick="closeDlg()">取消</button><button class="btn d" id="dlg-ok">删除</button></div>
+ </div>
+</div>
 <script>
 const $=s=>document.querySelector(s);
 const ymd=d=>d.toLocaleDateString('sv');
 const tmr=()=>{const d=new Date();d.setDate(d.getDate()+1);return ymd(d)};
+function hhmm(t){return t?String(t).slice(-5):''}
 function dur(a,b){const x=a.split(':').map(Number),y=b.split(':').map(Number);let m=(y[0]*60+y[1])-(x[0]*60+x[1]);if(m<0)m+=1440;return Math.floor(m/60)+'h'+(m%60)+'m'}
 function sleepTxt(s){
-  const isNap=s.sleep_time&&s.wake_time&&s.sleep_time>='10:00'&&s.wake_time<='20:00';
-  if(isNap)return `😴 午休 ${esc(s.sleep_time)} → ${esc(s.wake_time)} · ${dur(s.sleep_time,s.wake_time)}`;
-  let t=(s.sleep_time?'🌙 '+esc(s.sleep_time):'')+(s.sleep_time&&s.wake_time?' → ':'')+(s.wake_time?'☀️ '+esc(s.wake_time):'');
-  if(s.sleep_time&&s.wake_time)t+=' · '+dur(s.sleep_time,s.wake_time);
-  return t}
+  let h='';
+  if(s.sleep_time||s.wake_time){
+    const a=hhmm(s.sleep_time),b=hhmm(s.wake_time);
+    h+='🌙 '+(a||'?')+' → ☀️ '+(b||'?');
+    if(a&&b)h+=' · '+dur(a,b);
+  }
+  if(s.nap_sleep_time||s.nap_wake_time){
+    const a=hhmm(s.nap_sleep_time),b=hhmm(s.nap_wake_time);
+    if(h)h+='<br>';
+    h+='😴 午休 '+(a||'?')+' → '+(b||'?');
+    if(a&&b)h+=' · '+dur(a,b);
+  }
+  return h||'—'}
 const MI={'早餐':'🌅','午餐':'🍱','晚餐':'🌙','加餐':'🍎'};
 let token=localStorage.t||'',date=ymd(new Date()),view='day',imgs=[],chat={},profile={},calMonth=date.slice(0,7),calMode='c';
 async function api(p,o={}){
@@ -116,10 +143,10 @@ async function render(){
     $('#prev').style.visibility=$('#next').style.visibility=view==='set'?'hidden':'visible';
     if(view==='day'){
       const dd=new Date(date+'T00:00');
-      $('#title').innerHTML=dd.toLocaleDateString('zh-CN',{month:'long',day:'numeric'})+`<small>${dd.toLocaleDateString('zh-CN',{weekday:'long'})}${date===ymd(new Date())?' · 今天':''}</small>`;
+      $('#title').innerHTML=`<span class="brand">keepfit</span><small>${dd.toLocaleDateString('zh-CN',{month:'long',day:'numeric'})} ${dd.toLocaleDateString('zh-CN',{weekday:'long'})}${date===ymd(new Date())?' · 今天':''}</small>`;
       await renderDay();$('#main').scrollTop=0}
-    else if(view==='cal'){const[y,m]=calMonth.split('-');$('#title').innerHTML=`${y}年${+m}月`;await renderCal()}
-    else{$('#title').innerHTML='我的目标';await renderSet()}
+    else if(view==='cal'){const[y,m]=calMonth.split('-');$('#title').innerHTML=`<span class="brand">keepfit</span><small>${y}年${+m}月</small>`;await renderCal()}
+    else{$('#title').innerHTML=`<span class="brand">keepfit</span><small>我的目标</small>`;await renderSet()}
   }catch(e){$('#main').innerHTML=`<div class="card err">出错了：${esc(e.message)}</div>`}}
 async function renderDay(){
   const d=await api('day?date='+date);
@@ -140,7 +167,11 @@ async function renderDay(){
   +`</div></div><div id="chat"></div>`;
   $('#main').innerHTML=h;drawChat()}
 function fold(el){el.closest('.card').classList.toggle('fold')}
-async function del(k,id){if(confirm('删除这条记录？')){await api(k+'/'+id,{method:'DELETE'});render()}}
+function closeDlg(){$('#modal').classList.remove('on')}
+function del(k,id){
+  const m=$('#modal'),ok=$('#dlg-ok');
+  m.classList.add('on');
+  ok.onclick=async()=>{ok.disabled=true;try{await api(k+'/'+id,{method:'DELETE'});closeDlg();render()}catch(e){alert('删除失败：'+e.message)}finally{ok.disabled=false}}}
 function drawChat(){
   const el=$('#chat');if(!el)return;const L=chat[date]||[];
   if(!L.length){el.innerHTML='';return}
@@ -156,13 +187,16 @@ function drawChat(){
     p.sleeps.forEach(x=>h+=`<div class="row"><div class="n">${sleepTxt(x)}<small>${esc(x.note)}</small></div></div>`);
     if(p.meals.length+p.workouts.length+p.weights.length+p.sleeps.length)
       h+=m.done?`<div class="empty" style="margin-top:6px">${m.done===1?'✓ 已记录':'已取消'}</div>`
+      :m.busy?`<div class="btns"><button class="btn" disabled>取消</button><button class="btn p" disabled>${m.busy===1?'记录中…':'取消中…'}</button></div>`
       :`<div class="btns"><button class="btn" onclick="fin(${i},2)">取消</button><button class="btn p" onclick="fin(${i},1)">确认记录</button></div>`;
     return h+'</div>'}).join('');
   $('#main').scrollTop=1e9}
 async function fin(i,s){
-  const m=chat[date][i];
+  const m=chat[date][i];if(m.busy)return;
+  m.busy=s;drawChat();
   try{if(s===1)await api('commit',{method:'POST',body:{date:m.p.date,meals:m.p.meals,workouts:m.p.workouts,weights:m.p.weights,sleeps:m.p.sleeps}});
-    m.done=s;if(s===1&&m.p.date!==date)date=m.p.date;render()}catch(e){alert('保存失败：'+e.message)}}
+    m.done=s;if(s===1&&m.p.date!==date)date=m.p.date}catch(e){alert('保存失败：'+e.message)}
+  m.busy=0;render()}
 function shrink(f){return new Promise(r=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1024/Math.max(im.width,im.height)),c=document.createElement('canvas');
   c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',.8))};im.src=URL.createObjectURL(f)})}
 function badge(){const b=$('#nimg');b.hidden=!imgs.length;b.textContent=imgs.length}
@@ -209,20 +243,24 @@ async function renderCal(){
   const first=(new Date(y,m-1,1).getDay()+6)%7,n=new Date(y,m,0).getDate(),td=ymd(new Date());
   let h=seg+'<div class="cal">'+[...'一二三四五六日'].map(x=>`<div class="wd">${x}</div>`).join('')+'<i></i>'.repeat(first);
   for(let i=1;i<=n;i++){const k=`${calMonth}-${String(i).padStart(2,'0')}`,v=data[k];
-    h+=`<button class="${k===td?'t':''} ${v?'has':''}" onclick="date='${k}';go('day')">${i}${v&&v.intake?`<small>${v.intake}</small>`:''}${v&&v.burn?`<small class="b">-${v.burn}</small>`:''}${v&&v.weight?`<small class="g">${v.weight}</small>`:''}${v&&v.sleep?`<small class="s">😴${(v.sleep/60).toFixed(1)}h</small>`:''}</button>`}
+    let net='';
+    if(v&&(v.intake||v.burn)){const d=Math.round(v.intake-(v.bmr||0)-v.burn);net=`<small class="${d<=0?'d':'u'}">${d>0?'+':''}${d}</small>`}
+    h+=`<button class="${k===td?'t':''} ${v?'has':''}" onclick="date='${k}';go('day')">${i}${net}</button>`}
   $('#main').innerHTML=h+'</div>'}
 async function renderSet(){
   profile=await api('profile');const p=profile;
   const f=(id,l,t,v,x='')=>`<label>${l}</label><input class="f" id="f-${id}" type="${t}" ${x} value="${v??''}">`;
+  const est=Math.round(10*(p.weight_kg||0)+6.25*(p.height_cm||0)-5*(p.age||0)+(p.sex==='female'?-161:5));
   $('#main').innerHTML=`<div class="card"><label style="margin-top:0">性别</label><select class="f" id="f-sex"><option value="male">男</option><option value="female">女</option></select>
   ${f('age','年龄','number',p.age,'inputmode=numeric')}${f('h','身高 (cm)','number',p.height_cm,'step=0.1 inputmode=decimal')}${f('w','当前体重 (kg)','number',p.weight_kg,'step=0.1 inputmode=decimal')}
   ${f('tw','目标体重 (kg)','number',p.target_weight_kg,'step=0.1 inputmode=decimal')}${f('td','目标日期','date',p.target_date,'min='+ymd(new Date()))}
+  ${f('bmr','基础代谢 (kcal)','number',p.bmr??est,'step=1 inputmode=numeric')}
   <button class="btn p" style="margin-top:20px;width:100%" onclick="saveP()">保存</button></div>`;
   $('#f-sex').value=p.sex||'male'}
 async function saveP(){
   const g=i=>$('#f-'+i).value;
   if(!g('age')||!g('h')||!g('w')||!g('tw')||!g('td'))return alert('请填完整');
-  try{await api('profile',{method:'POST',body:{sex:g('sex'),age:+g('age'),height_cm:+g('h'),weight_kg:+g('w'),target_weight_kg:+g('tw'),target_date:g('td')}});
+  try{await api('profile',{method:'POST',body:{sex:g('sex'),age:+g('age'),height_cm:+g('h'),weight_kg:+g('w'),target_weight_kg:+g('tw'),target_date:g('td'),bmr:g('bmr')?+g('bmr'):null}});
     profile=await api('profile');go('day')}catch(e){alert('保存失败：'+e.message)}}
 api('profile').then(p=>{profile=p;if(!p.height_cm)view='set';render()}).catch(e=>{$('#main').innerHTML=`<div class="card err">无法连接后端：${esc(e.message)}</div>`});
 </script></body></html>

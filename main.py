@@ -20,15 +20,24 @@ def db():
 with closing(db()) as c:
     c.executescript("""
     CREATE TABLE IF NOT EXISTS profile(id INTEGER PRIMARY KEY CHECK(id=1), sex TEXT, age INT,
-      height_cm REAL, weight_kg REAL, target_weight_kg REAL, target_date TEXT);
+      height_cm REAL, weight_kg REAL, target_weight_kg REAL, target_date TEXT, bmr REAL);
     CREATE TABLE IF NOT EXISTS meals(id INTEGER PRIMARY KEY, date TEXT, time TEXT, meal_type TEXT,
       name TEXT, amount TEXT, kcal REAL);
     CREATE TABLE IF NOT EXISTS workouts(id INTEGER PRIMARY KEY, date TEXT, name TEXT, detail TEXT, kcal REAL);
     CREATE TABLE IF NOT EXISTS weights(id INTEGER PRIMARY KEY, date TEXT, kg REAL);
-    CREATE TABLE IF NOT EXISTS sleeps(id INTEGER PRIMARY KEY, date TEXT, sleep_time TEXT, wake_time TEXT, note TEXT);
+    CREATE TABLE IF NOT EXISTS sleeps(id INTEGER PRIMARY KEY, date TEXT, sleep_time TEXT, wake_time TEXT,
+      nap_sleep_time TEXT, nap_wake_time TEXT, note TEXT);
     CREATE INDEX IF NOT EXISTS i_wt ON weights(date); CREATE INDEX IF NOT EXISTS i_sl ON sleeps(date);
     CREATE INDEX IF NOT EXISTS i_m ON meals(date); CREATE INDEX IF NOT EXISTS i_w ON workouts(date);
     """)
+    cols = {r["name"] for r in c.execute("PRAGMA table_info(sleeps)")}
+    for col in ("nap_sleep_time", "nap_wake_time"):  # 兼容旧库
+        if col not in cols:
+            c.execute(f"ALTER TABLE sleeps ADD COLUMN {col} TEXT")
+    pcols = {r["name"] for r in c.execute("PRAGMA table_info(profile)")}
+    if "bmr" not in pcols:  # 兼容旧库
+        c.execute("ALTER TABLE profile ADD COLUMN bmr REAL")
+    c.commit()
 
 
 def auth(x_token: str = Header("")):
@@ -52,6 +61,7 @@ class Profile(BaseModel):
     weight_kg: float
     target_weight_kg: float
     target_date: str
+    bmr: float | None = None
 
 
 @app.get("/api/profile")
@@ -62,16 +72,27 @@ def profile_get():
 @app.post("/api/profile")
 def profile_set(p: Profile):
     try:
-        ok = dt.date.fromisoformat(p.target_date) >= dt.date.today()
+        ok = dt.date.fromisoformat(p.target_date) > dt.date.today()
     except ValueError:
         ok = False
     if not ok:
-        raise HTTPException(400, "目标日期不能早于今天")
+        raise HTTPException(400, "目标日期必须晚于今天")
     with closing(db()) as c:
-        c.execute("REPLACE INTO profile VALUES(1,?,?,?,?,?,?)",
-                  (p.sex, p.age, p.height_cm, p.weight_kg, p.target_weight_kg, p.target_date))
+        c.execute("REPLACE INTO profile VALUES(1,?,?,?,?,?,?,?)",
+                  (p.sex, p.age, p.height_cm, p.weight_kg, p.target_weight_kg, p.target_date, p.bmr))
         c.commit()
     return {"ok": True}
+
+
+def bmr_value():
+    """基础代谢率：优先用档案里手填的 bmr，否则按 Mifflin-St Jeor 公式估算（体重优先取最近一次称重）"""
+    p = get_profile()
+    if not p:
+        return 0
+    with closing(db()) as c:
+        r = c.execute("SELECT kg FROM weights ORDER BY date DESC, id DESC LIMIT 1").fetchone()
+    weight = r["kg"] if r else p["weight_kg"]  # 优先用最近一次称重
+    return p["bmr"] or (10 * weight + 6.25 * p["height_cm"] - 5 * p["age"] + (5 if p["sex"] == "male" else -161))
 
 
 def budget(burn):
@@ -82,7 +103,7 @@ def budget(burn):
     with closing(db()) as c:
         r = c.execute("SELECT kg FROM weights ORDER BY date DESC, id DESC LIMIT 1").fetchone()
     weight = r["kg"] if r else p["weight_kg"]  # 优先用最近一次称重
-    bmr = 10 * weight + 6.25 * p["height_cm"] - 5 * p["age"] + (5 if p["sex"] == "male" else -161)
+    bmr = bmr_value()
     base = bmr * 1.2
     try:
         days = max((dt.date.fromisoformat(p["target_date"]) - dt.date.today()).days, 1)
@@ -106,16 +127,27 @@ def day(date: str):
 
 
 def sleep_minutes(sleep_time, wake_time):
-    """计算睡眠时长（分钟），跨零点自动加一天；缺任一时间返回 0"""
+    """计算睡眠时长（分钟）。支持完整日期时间（YYYY-MM-DD HH:MM）或纯时间（HH:MM，跨零点自动加一天）；缺任一时间返回 0"""
     if not sleep_time or not wake_time:
         return 0
     try:
-        a = dt.datetime.strptime(sleep_time, "%H:%M")
-        b = dt.datetime.strptime(wake_time, "%H:%M")
+        a = dt.datetime.fromisoformat(sleep_time)
+        b = dt.datetime.fromisoformat(wake_time)
     except ValueError:
-        return 0
+        try:
+            a = dt.datetime.strptime(sleep_time, "%H:%M")
+            b = dt.datetime.strptime(wake_time, "%H:%M")
+        except ValueError:
+            return 0
+        m = int((b - a).total_seconds() // 60)
+        return m + 1440 if m < 0 else m
     m = int((b - a).total_seconds() // 60)
-    return m + 1440 if m < 0 else m
+    return m if m > 0 else 0
+
+
+def row_sleep_minutes(s):
+    """一条睡眠记录的总时长：夜间睡眠 + 午休"""
+    return sleep_minutes(s["sleep_time"], s["wake_time"]) + sleep_minutes(s["nap_sleep_time"], s["nap_wake_time"])
 
 
 @app.get("/api/month")
@@ -126,18 +158,20 @@ def month(month: str):  # YYYY-MM
             SELECT date, kcal i, 0 b FROM meals WHERE date LIKE ? UNION ALL
             SELECT date, 0, kcal FROM workouts WHERE date LIKE ?) GROUP BY date""", (like, like)).fetchall()
         ws = c.execute("SELECT date, kg FROM weights WHERE date LIKE ? ORDER BY id", (like,)).fetchall()
-        ss = c.execute("SELECT date, sleep_time, wake_time FROM sleeps WHERE date LIKE ? ORDER BY id", (like,)).fetchall()
+        ss = c.execute("SELECT date, sleep_time, wake_time, nap_sleep_time, nap_wake_time FROM sleeps WHERE date LIKE ? ORDER BY id", (like,)).fetchall()
     out = {r["date"]: {"intake": round(r["i"] or 0), "burn": round(r["b"] or 0), "weight": None, "sleep": None} for r in rows}
     for w in ws:  # 同一天多次称重取最后一次
         out.setdefault(w["date"], {"intake": 0, "burn": 0, "weight": None, "sleep": None})["weight"] = w["kg"]
     for s in ss:  # 同一天多条睡眠累加时长（分钟）
-        m = sleep_minutes(s["sleep_time"], s["wake_time"])
+        m = row_sleep_minutes(s)
         if m:
             d = out.setdefault(s["date"], {"intake": 0, "burn": 0, "weight": None, "sleep": None})
             d["sleep"] = (d["sleep"] or 0) + m
+    bmr = bmr_value()
     for v in out.values():
         v.setdefault("weight", None)
         v.setdefault("sleep", None)
+        v["bmr"] = bmr
     return out
 
 
@@ -153,7 +187,7 @@ def delete(kind: str, id: int):
 
 SYSTEM = """你是饮食与运动记录助手。把用户消息拆分成结构化记录，只输出一个JSON对象，不要任何其他文字：
 {{"date":"YYYY-MM-DD","meals":[{{"time":"HH:MM","meal_type":"早餐|午餐|晚餐|加餐","name":"","amount":"","kcal":0}}],
-"workouts":[{{"name":"","detail":"","kcal":0}}],"weights":[{{"kg":0.0}}],"sleeps":[{{"sleep_time":"HH:MM","wake_time":"HH:MM","note":""}}],"reply":"一句简短中文说明/估算依据，需要追问时写在这里"}}
+"workouts":[{{"name":"","detail":"","kcal":0}}],"weights":[{{"kg":0.0}}],"sleeps":[{{"sleep_time":"YYYY-MM-DD HH:MM","wake_time":"YYYY-MM-DD HH:MM","nap_sleep_time":"YYYY-MM-DD HH:MM","nap_wake_time":"YYYY-MM-DD HH:MM","note":""}}],"reply":"一句简短中文说明/估算依据，需要追问时写在这里"}}
 规则：
 1. 今天是{today}，现在时间{now}，用户当前查看的日期是{date}。date默认取查看日期；消息里若有明确日期（如“1001”表示10月1日，年份取今年）则用该日期。
 2. 用户直接给出kcal就原样使用；否则根据食物和份量估算（拳头大小≈一个中等水果/约150-200g主食），kcal为整数。
@@ -161,7 +195,10 @@ SYSTEM = """你是饮食与运动记录助手。把用户消息拆分成结构�
 4. 运动：每个动作/项目单独一条，name为项目名，detail保留用户原始数据（时长/组数x次数/重量），kcal按体重{weight}kg估算该项目消耗；力量训练考虑组数、次数、重量和间歇；辅助引体向上的重量是辅助重量。
 5. 用户发的图片如果是食物就识别并估算；如果是营养成分表就按表计算。
 6. 体重：用户提到称重/体重数值时记入weights（kg，一天可多次），不要估算体重。
-7. 作息：入睡/起床时间记入sleeps，每条sleeps代表一段睡眠。“昨晚11点半睡的”=sleep_time为23:30；“刚起床”=wake_time取现在时间；只知其一时另一个填空字符串。午休单独记一条（如“中午睡了半小时”=sleep_time为13:00、wake_time为13:30，按用户描述的时间或默认13:00-13:30）。note只写用户提到的睡眠情况。作息不影响热量计算；同一条消息可同时包含饮食、运动、体重、作息。
+7. 作息：一条sleeps代表一天的睡眠，包含夜间睡眠和午休两部分，时间一律用完整日期时间“YYYY-MM-DD HH:MM”。
+   - 夜间睡眠：sleep_time是“昨晚睡觉时间”，日期取查看日期的前一天；wake_time是“今天起床时间”，日期取查看日期。例如查看日期是{date}，“昨晚11点半睡、今早7点起”=sleep_time为前一天23:30、wake_time为{date} 07:00。
+   - 午休：nap_sleep_time是午休入睡时间、nap_wake_time是午休起床时间，日期都取查看日期（如“中午睡了半小时”=nap_sleep_time为{date} 13:00、nap_wake_time为{date} 13:30）。没有午休时两个字段填空字符串。
+   - 只知夜间或午休其一时，另一个填空字符串；note只写用户提到的睡眠情况。作息不影响热量计算；同一条消息可同时包含饮食、运动、体重、作息。
 8. 无法判断时所有数组留空，并在reply里提问。
 9. 引用历史：用户说“和昨天/前天/某天吃的一样”“照旧”“同上”等时，从下方【历史饮食记录】中找到对应日期的饮食，原样复制其name、amount、kcal（meal_type、time可沿用原记录），date用用户当前要记录的日期（默认查看日期）。历史里没有对应日期时不要编造，在reply里说明并追问。
 【历史饮食记录】
@@ -234,8 +271,9 @@ def commit(b: Commit):
             if w.get("kg"):
                 c.execute("INSERT INTO weights(date,kg) VALUES(?,?)", (b.date, w["kg"]))
         for x in b.sleeps:
-            c.execute("INSERT INTO sleeps(date,sleep_time,wake_time,note) VALUES(?,?,?,?)",
-                      (b.date, x.get("sleep_time"), x.get("wake_time"), x.get("note")))
+            c.execute("INSERT INTO sleeps(date,sleep_time,wake_time,nap_sleep_time,nap_wake_time,note) VALUES(?,?,?,?,?,?)",
+                      (b.date, x.get("sleep_time"), x.get("wake_time"),
+                       x.get("nap_sleep_time"), x.get("nap_wake_time"), x.get("note")))
         c.commit()
     return {"ok": True}
 
