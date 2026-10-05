@@ -230,11 +230,20 @@ def meal_history(days: int = 7) -> str:
     return "\n".join(lines) if lines else "（暂无历史记录）"
 
 
+# 引用历史饮食的触发词：命中才查库，避免每次请求都读 meals 表
+HISTORY_HINTS = ("昨天", "前天", "昨天吃", "一样", "照旧", "同上", "老样子", "老规矩", "和上次", "跟上次", "之前吃")
+
+
+def needs_history(text: str) -> bool:
+    """判断用户消息是否在引用历史饮食（如“和昨天一样”“照旧”）"""
+    return any(k in text for k in HISTORY_HINTS)
+
+
 @app.post("/api/parse")
 def parse(b: ParseIn):
     p = get_profile() or {}
     sys = SYSTEM.format(today=b.today, now=b.now, date=b.date, weight=p.get("weight_kg", 65),
-                        history=meal_history())
+                        history=meal_history() if needs_history(b.text) else "（本次未引用历史记录）")
     content = [{"type": "text", "text": b.text or "（见图片）"}]
     content += [{"type": "image_url", "image_url": {"url": u}} for u in b.images]
     msgs = [{"role": "system", "content": sys}]
