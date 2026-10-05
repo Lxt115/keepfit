@@ -240,16 +240,15 @@ def needs_history(text: str) -> bool:
 
 
 def call_model(msgs):
-    """调用模型；若首次请求超过 6s（多为冷连接/网络抖动）则自动重试一次"""
-    t = time.time()
-    try:
-        return client.chat.completions.create(
-            model=MODEL, response_format={"type": "json_object"}, timeout=60, messages=msgs)
-    except Exception:
-        if time.time() - t < 6:  # 快速失败（如参数错误）不重试
-            raise
-    return client.chat.completions.create(
-        model=MODEL, response_format={"type": "json_object"}, timeout=60, messages=msgs)
+    """调用模型；请求超过 10s 失败（多为冷连接/网络抖动）则重试，最多重试 2 次后放弃"""
+    for i in range(3):  # 首次 + 最多 2 次重试
+        t = time.time()
+        try:
+            return client.chat.completions.create(
+                model=MODEL, response_format={"type": "json_object"}, timeout=60, messages=msgs)
+        except Exception:
+            if time.time() - t < 10 or i == 2:  # 快速失败（如参数错误）不重试；已重试 2 次则放弃
+                raise
 
 
 @app.post("/api/parse")
