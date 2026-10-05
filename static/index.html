@@ -66,6 +66,9 @@ nav button.on{color:var(--ac)}
 .cal i{visibility:hidden}
 label{display:block;margin:14px 0 4px;color:var(--sub);font-size:13px}
 .f{width:100%;padding:12px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);color:var(--tx);font:inherit;font-size:16px}
+input[type=date].f{-webkit-appearance:none;appearance:none;min-width:0;display:block;line-height:normal}
+input[type=date].f::-webkit-date-and-time-value{text-align:left}
+input[type=date].f::-webkit-calendar-picker-indicator{margin-left:auto;opacity:.6}
 .err{color:var(--rd)}
 .seg{display:flex;background:var(--card);border-radius:14px;padding:3px;box-shadow:var(--sh);margin-bottom:12px;overflow-x:auto;scrollbar-width:none}
 .seg::-webkit-scrollbar{display:none}
