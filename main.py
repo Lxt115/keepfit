@@ -201,6 +201,7 @@ SYSTEM = """你是饮食与运动记录助手。把用户消息拆分成结构�
    - 只知夜间或午休其一时，另一个填空字符串；note只写用户提到的睡眠情况。作息不影响热量计算；同一条消息可同时包含饮食、运动、体重、作息。
 8. 无法判断时所有数组留空，并在reply里提问。
 9. 引用历史：用户说“和昨天/前天/某天吃的一样”“照旧”“同上”等时，从下方【历史饮食记录】中找到对应日期的饮食，原样复制其name、amount、kcal（meal_type、time可沿用原记录），date用用户当前要记录的日期（默认查看日期）。历史里没有对应日期时不要编造，在reply里说明并追问。
+10. 多轮对话：本次请求可能包含同一会话中此前的对话消息（user/assistant）。当用户当前消息是补充、修正或指代上文时（如“再加一个鸡蛋”“刚才那个改成200g”“也是晚餐”），结合上文理解并只输出本次要新增/修正的记录；不要重复输出上文已确认过的记录。
 【历史饮食记录】
 {history}"""
 
@@ -211,6 +212,7 @@ class ParseIn(BaseModel):
     date: str
     today: str
     now: str
+    history: list[dict] = []  # 本会话已发生的多轮对话：[{"role":"user|assistant","content":"..."}]
 
 
 def meal_history(days: int = 7) -> str:
@@ -235,13 +237,19 @@ def parse(b: ParseIn):
                         history=meal_history())
     content = [{"type": "text", "text": b.text or "（见图片）"}]
     content += [{"type": "image_url", "image_url": {"url": u}} for u in b.images]
+    msgs = [{"role": "system", "content": sys}]
+    for h in b.history[-10:]:  # 仅保留最近若干轮，控制上下文长度
+        role = h.get("role")
+        if role in ("user", "assistant") and h.get("content"):
+            msgs.append({"role": role, "content": h["content"]})
+    msgs.append({"role": "user", "content": content})
     try:
         r = client.chat.completions.create(
-            model=MODEL, response_format={"type": "json_object"}, timeout=10,
-            messages=[{"role": "system", "content": sys}, {"role": "user", "content": content}])
+            model=MODEL, response_format={"type": "json_object"}, timeout=20,
+            messages=msgs)
         data = json.loads(r.choices[0].message.content)
     except APITimeoutError:
-        raise HTTPException(504, "模型响应超时（10s），请重试")
+        raise HTTPException(504, "模型响应超时（20s），请重试")
     except Exception as e:
         raise HTTPException(502, f"模型调用/解析失败: {e}")
     data.setdefault("date", b.date)

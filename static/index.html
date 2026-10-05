@@ -132,10 +132,10 @@ let token=localStorage.t||'',date=ymd(new Date()),view='day',imgs=[],chat={},pro
 const cache={};  // GET 请求缓存：key -> 数据，用于切换标签时秒开
 async function api(p,o={}){
   const method=o.method||'GET',key=method==='GET'?p:null;
-  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),12000);
+  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),22000);
   let r;
   try{r=await fetch('api/'+p,{method,headers:{'Content-Type':'application/json','X-Token':token},body:o.body&&JSON.stringify(o.body),signal:ac.signal})}
-  catch(e){throw new Error(e.name==='AbortError'?'请求超时（12s），请重试':e.message)}
+  catch(e){throw new Error(e.name==='AbortError'?'请求超时（22s），请重试':e.message)}
   finally{clearTimeout(tm)}
   if(r.status===401){token=prompt('访问口令')||'';localStorage.t=token;return api(p,o)}
   if(!r.ok)throw new Error((await r.text()).slice(0,200));
@@ -220,11 +220,16 @@ $('#file').onchange=async e=>{for(const f of e.target.files)imgs.push(await shri
 $('#txt').oninput=e=>{e.target.style.height='auto';e.target.style.height=e.target.scrollHeight+'px'};
 async function send(){
   const text=$('#txt').value.trim();if(!text&&!imgs.length)return;
-  const L=chat[date]=chat[date]||[];L.push({me:text,n:imgs.length});
+  const L=chat[date]=chat[date]||[];
+  const history=L.flatMap(m=>{
+    if(m.me!==undefined)return [{role:'user',content:m.me||'（见图片）'}];
+    if(m.p)return [{role:'assistant',content:m.p.reply||JSON.stringify(m.p)}];
+    return []});
+  L.push({me:text,n:imgs.length});
   const images=imgs;imgs=[];badge();$('#txt').value='';$('#txt').style.height='auto';
   L.push({err:'分析中…',load:1});drawChat();$('#send').disabled=true;
   try{const now=new Date();
-    const p=await api('parse',{method:'POST',body:{text,images,date,today:ymd(now),now:now.toTimeString().slice(0,5)}});
+    const p=await api('parse',{method:'POST',body:{text,images,date,today:ymd(now),now:now.toTimeString().slice(0,5),history}});
     L.pop();L.push({p})}catch(e){L.pop();L.push({err:'出错：'+e.message})}
   $('#send').disabled=false;drawChat()}
 function chart(data,y,m,mode){
