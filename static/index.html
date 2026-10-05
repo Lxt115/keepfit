@@ -12,7 +12,7 @@ body{font:15px/1.5 -apple-system,"PingFang SC",system-ui,sans-serif;background:v
 button{font:inherit;cursor:pointer;color:inherit}
 svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 6px}
-header h1{margin:0;font-size:20px;text-align:center;line-height:1.2}header small{display:block;font-size:12px;color:var(--sub);font-weight:400}header .brand{display:block;font-weight:700;letter-spacing:.5px}
+header h1{margin:0;font-size:20px;text-align:center;line-height:1.2}header small{display:block;font-size:12px;color:var(--sub);font-weight:400}
 .rb{width:36px;height:36px;border-radius:50%;border:0;background:var(--card);box-shadow:var(--sh);font-size:18px}
 main{flex:1;min-height:0;overflow-y:auto;padding:6px 16px 16px}
 .card{background:var(--card);border-radius:18px;padding:14px 16px;margin:12px 0;box-shadow:var(--sh)}
@@ -86,7 +86,7 @@ svg.ch{width:100%;height:auto;margin-top:6px}
 .dlg .btns{margin-top:0}
 .dlg .btn.d{background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;border:0}
 </style></head><body>
-<header><button class="rb" id="prev" onclick="shift(-1)">‹</button><h1 id="title"><span class="brand">keepfit</span></h1><button class="rb" id="next" onclick="shift(1)">›</button></header>
+<header><button class="rb" id="prev" onclick="shift(-1)">‹</button><h1 id="title"></h1><button class="rb" id="next" onclick="shift(1)">›</button></header>
 <main id="main"></main>
 <div id="bar">
  <button class="ib" style="position:relative" onclick="document.getElementById('file').click()"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span class="badge" id="nimg" hidden></span></button>
@@ -156,10 +156,10 @@ async function render(){
     $('#prev').style.visibility=$('#next').style.visibility=view==='set'?'hidden':'visible';
     if(view==='day'){
       const dd=new Date(date+'T00:00');
-      $('#title').innerHTML=`<span class="brand">keepfit</span><small>${dd.toLocaleDateString('zh-CN',{month:'long',day:'numeric'})} ${dd.toLocaleDateString('zh-CN',{weekday:'long'})}${date===ymd(new Date())?' · 今天':''}</small>`;
+      $('#title').innerHTML=`${dd.toLocaleDateString('zh-CN',{month:'long',day:'numeric'})}<small>${dd.toLocaleDateString('zh-CN',{weekday:'long'})}${date===ymd(new Date())?' · 今天':''}</small>`;
       await renderDay();$('#main').scrollTop=0}
-    else if(view==='cal'){const[y,m]=calMonth.split('-');$('#title').innerHTML=`<span class="brand">keepfit</span><small>${y}年${+m}月</small>`;await renderCal()}
-    else{$('#title').innerHTML=`<span class="brand">keepfit</span><small>我的目标</small>`;await renderSet()}
+    else if(view==='cal'){const[y,m]=calMonth.split('-');$('#title').innerHTML=`${y}年${+m}月`;await renderCal()}
+    else{$('#title').innerHTML='我的目标';await renderSet()}
   }catch(e){$('#main').innerHTML=`<div class="card err">出错了：${esc(e.message)}</div>`}}
 async function renderDay(){
   const key='day?date='+date;
