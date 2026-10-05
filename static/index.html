@@ -132,10 +132,10 @@ let token=localStorage.t||'',date=ymd(new Date()),view='day',imgs=[],chat={},pro
 const cache={};  // GET 请求缓存：key -> 数据，用于切换标签时秒开
 async function api(p,o={}){
   const method=o.method||'GET',key=method==='GET'?p:null;
-  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),22000);
+  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),65000);
   let r;
   try{r=await fetch('api/'+p,{method,headers:{'Content-Type':'application/json','X-Token':token},body:o.body&&JSON.stringify(o.body),signal:ac.signal})}
-  catch(e){throw new Error(e.name==='AbortError'?'请求超时（22s），请重试':e.message)}
+  catch(e){throw new Error(e.name==='AbortError'?'请求超时（65s），请重试':e.message)}
   finally{clearTimeout(tm)}
   if(r.status===401){token=prompt('访问口令')||'';localStorage.t=token;return api(p,o)}
   if(!r.ok)throw new Error((await r.text()).slice(0,200));

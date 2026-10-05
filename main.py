@@ -254,11 +254,11 @@ def parse(b: ParseIn):
     msgs.append({"role": "user", "content": content})
     try:
         r = client.chat.completions.create(
-            model=MODEL, response_format={"type": "json_object"}, timeout=20,
+            model=MODEL, response_format={"type": "json_object"}, timeout=60,
             messages=msgs)
         data = json.loads(r.choices[0].message.content)
     except APITimeoutError:
-        raise HTTPException(504, "模型响应超时（20s），请重试")
+        raise HTTPException(504, "模型响应超时（60s），请重试")
     except Exception as e:
         raise HTTPException(502, f"模型调用/解析失败: {e}")
     data.setdefault("date", b.date)
