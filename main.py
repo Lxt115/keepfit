@@ -8,7 +8,7 @@ from openai import OpenAI, APITimeoutError
 DB = os.getenv("DB_PATH", "data.db")
 TOKEN = os.getenv("APP_TOKEN", "")
 MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")  # V4.1-Flash, 支持图片
-client = OpenAI(api_key=os.getenv("DEEPSEEK_API_KEY", ""), base_url="https://api.deepseek.com")
+client = OpenAI(api_key=os.getenv("DEEPSEEK_API_KEY", ""), base_url="https://api.deepseek.com", max_retries=0)
 
 
 def db():
@@ -237,7 +237,7 @@ def parse(b: ParseIn):
     content += [{"type": "image_url", "image_url": {"url": u}} for u in b.images]
     try:
         r = client.chat.completions.create(
-            model=MODEL, response_format={"type": "json_object"}, timeout=10, max_retries=0,
+            model=MODEL, response_format={"type": "json_object"}, timeout=10,
             messages=[{"role": "system", "content": sys}, {"role": "user", "content": content}])
         data = json.loads(r.choices[0].message.content)
     except APITimeoutError:
