@@ -290,10 +290,14 @@ def commit(b: Commit):
 
 @app.middleware("http")
 async def cache_static(request, call_next):
-    """静态资源加缓存头，减少公网重复下载；API 响应不缓存"""
+    """静态资源加缓存头，减少公网重复下载；API 响应不缓存；index.html 每次校验，保证发版即时生效"""
     r = await call_next(request)
-    if not request.url.path.startswith("/api/"):
-        r.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
+    path = request.url.path
+    if not path.startswith("/api/"):
+        if path in ("/", "/index.html"):
+            r.headers["Cache-Control"] = "no-cache"
+        else:
+            r.headers["Cache-Control"] = "public, max-age=300, must-revalidate"
     return r
 
 

@@ -227,7 +227,7 @@ async function send(){
     return []});
   L.push({me:text,n:imgs.length});
   const images=imgs;imgs=[];badge();$('#txt').value='';$('#txt').style.height='auto';
-  L.push({err:'分析中…',load:1});drawChat();$('#send').disabled=true;
+  L.push({err:images.length?'图像解析中…':'分析中…',load:1});drawChat();$('#send').disabled=true;
   try{const now=new Date();
     const p=await api('parse',{method:'POST',body:{text,images,date,today:ymd(now),now:now.toTimeString().slice(0,5),history}});
     L.pop();L.push({p})}catch(e){L.pop();L.push({err:'出错：'+e.message})}
