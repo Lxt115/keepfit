@@ -64,6 +64,8 @@ nav button.on{color:var(--ac)}
 .cal button small{font-size:8px;color:var(--ac);font-weight:500;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cal button small.d{color:var(--ac)}.cal button small.u{color:var(--or)}
 .cal button.t{outline:2px solid var(--ac)}.cal button.has{background:linear-gradient(180deg,var(--card),rgba(16,185,129,.12))}
 .cal i{visibility:hidden}
+.sum{font-size:26px;font-weight:700;text-align:center;margin:6px 0 2px}
+.sum.d{color:var(--ac)}.sum.u{color:var(--or)}
 label{display:block;margin:14px 0 4px;color:var(--sub);font-size:13px}
 .f{width:100%;padding:12px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);color:var(--tx);font:inherit;font-size:16px}
 input[type=date].f{-webkit-appearance:none;appearance:none;min-width:0;display:block;line-height:normal}
@@ -267,11 +269,17 @@ function drawCal(data){
   if(calMode!=='c'){$('#main').innerHTML=seg+chart(data,y,m,calMode);return}
   const first=(new Date(y,m-1,1).getDay()+6)%7,n=new Date(y,m,0).getDate(),td=ymd(new Date());
   let h=seg+'<div class="cal">'+[...'一二三四五六日'].map(x=>`<div class="wd">${x}</div>`).join('')+'<i></i>'.repeat(first);
+  let total=0,days=0;
   for(let i=1;i<=n;i++){const k=`${calMonth}-${String(i).padStart(2,'0')}`,v=data[k];
     let net='';
-    if(v&&(v.intake||v.burn)){const d=Math.round(v.intake-(v.bmr||0)-v.burn);net=`<small class="${d<=0?'d':'u'}">${d>0?'+':''}${d}</small>`}
+    if(v&&(v.intake||v.burn)){const d=Math.round(v.intake-(v.bmr||0)-v.burn);total+=d;days++;net=`<small class="${d<=0?'d':'u'}">${d>0?'+':''}${d}</small>`}
     h+=`<button class="${k===td?'t':''} ${v?'has':''}" onclick="date='${k}';go('day')">${i}${net}</button>`}
-  $('#main').innerHTML=h+'</div>'}
+  h+='</div>';
+  if(days){const kg=Math.abs(total)/7700;
+    h+=`<div class="card"><div class="sec">本月累计${total<=0?'热量缺口':'热量增量'}<em>${days} 天有记录</em></div>
+    <div class="sum ${total<=0?'d':'u'}">${total>0?'+':''}${total} kcal</div>
+    <div class="empty" style="text-align:center">约等于 ${total<=0?'减重':'增重'} ${kg.toFixed(2)} kg</div></div>`}
+  $('#main').innerHTML=h}
 async function renderSet(){
   if(cache.profile)drawSet(cache.profile);  // 有缓存先秒开
   profile=await api('profile');drawSet(profile)}
