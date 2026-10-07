@@ -274,7 +274,7 @@ function drawCal(data){
     h+=`<button class="${k===td?'t':''} ${v?'has':''}" onclick="date='${k}';go('day')">${i}${net}</button>`}
   h+='</div>';
   if(days){const kg=Math.abs(total)/7700;
-    h+=`<div class="sec" style="margin-top:12px">本月累计${total<=0?'热量缺口':'热量增量'}<em>${total>0?'+':''}${total} kcal · 约${total<=0?'减重':'增重'} ${kg.toFixed(2)} kg</em></div>`}
+    h+=`<div class="sec" style="margin-top:12px"><em style="margin-left:auto">本月累计${total<=0?'热量缺口':'热量增量'} ${total>0?'+':''}${total} kcal · 约${total<=0?'减重':'增重'} ${kg.toFixed(2)} kg</em></div>`}
   $('#main').innerHTML=h}
 async function renderSet(){
   if(cache.profile)drawSet(cache.profile);  // 有缓存先秒开
