@@ -270,7 +270,7 @@ function drawCal(data){
   let total=0,days=0;
   for(let i=1;i<=n;i++){const k=`${calMonth}-${String(i).padStart(2,'0')}`,v=data[k];
     let net='';
-    if(v&&(v.intake||v.burn)){const d=Math.round(v.intake-(v.bmr||0)-v.burn);total+=d;days++;net=`<small class="${d<=0?'d':'u'}">${d>0?'+':''}${d}</small>`}
+    if(v&&(v.intake||v.burn)){const d=Math.round(v.intake-(v.base||0)-v.burn);total+=d;days++;net=`<small class="${d<=0?'d':'u'}">${d>0?'+':''}${d}</small>`}
     h+=`<button class="${k===td?'t':''} ${v?'has':''}" onclick="date='${k}';go('day')">${i}${net}</button>`}
   h+='</div>';
   if(days){const kg=Math.abs(total)/7700;

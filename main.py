@@ -167,11 +167,11 @@ def month(month: str):  # YYYY-MM
         if m:
             d = out.setdefault(s["date"], {"intake": 0, "burn": 0, "weight": None, "sleep": None})
             d["sleep"] = (d["sleep"] or 0) + m
-    bmr = bmr_value()
+    base = round(bmr_value() * 1.2)  # 基础代谢*1.2(久坐系数)，与记录页预算口径一致
     for v in out.values():
         v.setdefault("weight", None)
         v.setdefault("sleep", None)
-        v["bmr"] = bmr
+        v["base"] = base
     return out
 
 
