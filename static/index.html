@@ -74,6 +74,9 @@ input[type=date].f::-webkit-calendar-picker-indicator{margin-left:auto;opacity:.
 .seg::-webkit-scrollbar{display:none}
 .seg button{flex:1 0 auto;white-space:nowrap;border:0;background:none;padding:8px 10px;border-radius:11px;font-size:14px;color:var(--sub)}
 .seg button.on{background:var(--ac);color:#fff;font-weight:600}
+.seg.sub{margin-top:-6px;padding:2px;background:var(--bg);box-shadow:none}
+.seg.sub button{padding:6px 10px;font-size:13px}
+.seg.sub button.on{background:var(--card);color:var(--ac);box-shadow:var(--sh)}
 svg.ch{width:100%;height:auto;margin-top:6px}
 #modal{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.4);backdrop-filter:blur(2px)}
 #modal.on{display:flex}
@@ -128,7 +131,7 @@ function sleepTxt(s){
   }
   return h||'—'}
 const MI={'早餐':'🌅','午餐':'🍱','晚餐':'🌙','加餐':'🍎'};
-let token=localStorage.t||'',date=ymd(new Date()),view='day',imgs=[],chat={},profile={},calMonth=date.slice(0,7),calMode='c';
+let token=localStorage.t||'',date=ymd(new Date()),view='day',imgs=[],chat={},profile={},calMonth=date.slice(0,7),calMode='c',wMode='d';
 const cache={};  // GET 请求缓存：key -> 数据，用于切换标签时秒开
 async function api(p,o={}){
   const method=o.method||'GET',key=method==='GET'?p:null;
@@ -257,6 +260,20 @@ function chart(data,y,m,mode){
     :mode==='s'?`日均 ${(sum/vs.length/60).toFixed(1)} h · 共 ${pts.length} 天`
     :`日均 ${Math.round(sum/vs.length)} · 共 ${Math.round(sum)} kcal`;
   return `<div class="card"><div class="sec">${{w:'体重变化',i:'每日摄入',b:'每日运动消耗',s:'每日睡眠时长'}[mode]}<em>${info}</em></div>${s}</svg><div class="empty" style="text-align:center">点击数据点或柱子可跳到当天</div></div>`}
+function chartWeek(ws){
+  if(!ws.length)return `<div class="card empty" style="text-align:center">本月还没有体重数据</div>`;
+  const W=340,H=220,L=40,R=10,T=18,B=24,n=ws.length,vs=ws.map(w=>w.avg),last=vs[vs.length-1],col='var(--ac)';
+  let lo=Math.min(...vs),hi=Math.max(...vs);const pad=Math.max((hi-lo)*.3,.5);lo-=pad;hi+=pad;
+  const X=i=>L+(i-.5)*(W-L-R)/n,Y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo)),fmt=v=>v.toFixed(1);
+  let s=`<svg class="ch" viewBox="0 0 ${W} ${H}">`;
+  for(let k=0;k<4;k++){const v=lo+(hi-lo)*k/3;s+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--bd)"/><text x="${L-5}" y="${Y(v)+3}" text-anchor="end" font-size="10" fill="var(--sub)">${fmt(v)}</text>`}
+  ws.forEach((w,i)=>{const md=w.start.slice(5).replace('-','/');s+=`<text x="${X(i+1)}" y="${H-7}" text-anchor="middle" font-size="10" fill="var(--sub)">${md}</text>`});
+  s+=`<path d="${ws.map((w,k)=>(k?'L':'M')+X(k+1)+','+Y(w.avg)).join(' ')}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  ws.forEach((w,i)=>s+=`<circle cx="${X(i+1)}" cy="${Y(w.avg)}" r="4.5" fill="var(--card)" stroke="${col}" stroke-width="2.5" onclick="date='${w.start}';go('day')"/>`);
+  const q=ws[ws.length-1];s+=`<text x="${Math.min(X(n),W-R-12)}" y="${Y(q.avg)-9}" text-anchor="middle" font-size="11" font-weight="600" fill="${col}">${fmt(q.avg)}</text>`;
+  const dlt=last-vs[0];
+  const info=`最新周均 ${fmt(last)} kg · 本月 ${dlt>=0?'+':''}${dlt.toFixed(1)} kg`;
+  return `<div class="card"><div class="sec">每周平均体重<em>${info}</em></div>${s}</svg><div class="empty" style="text-align:center">每周一至周日取平均，点击数据点可跳到该周周一</div></div>`}
 async function renderCal(){
   const key='month?month='+calMonth;
   if(cache[key])drawCal(cache[key]);  // 有缓存先秒开
@@ -264,6 +281,11 @@ async function renderCal(){
 function drawCal(data){
   const[y,m]=calMonth.split('-').map(Number);
   const seg=`<div class="seg">`+[['c','日历'],['w','体重'],['i','摄入'],['b','运动'],['s','睡眠']].map(([k,l])=>`<button class="${calMode===k?'on':''}" onclick="calMode='${k}';render()">${l}</button>`).join('')+`</div>`;
+  if(calMode==='w'){
+    const sub=`<div class="seg sub">`+[['d','每日'],['w','每周']].map(([k,l])=>`<button class="${wMode===k?'on':''}" onclick="wMode='${k}';render()">${l}</button>`).join('')+`</div>`;
+    if(wMode==='w'){$('#main').innerHTML=seg+sub+`<div class="card empty" style="text-align:center">加载中…</div>`;
+      api('weeks?month='+calMonth).then(w=>{$('#main').innerHTML=seg+sub+chartWeek(w)}).catch(e=>{$('#main').innerHTML=seg+sub+`<div class="card err">出错了：${esc(e.message)}</div>`});return}
+    $('#main').innerHTML=seg+sub+chart(data,y,m,calMode);return}
   if(calMode!=='c'){$('#main').innerHTML=seg+chart(data,y,m,calMode);return}
   const first=(new Date(y,m-1,1).getDay()+6)%7,n=new Date(y,m,0).getDate(),td=ymd(new Date());
   let h=seg+'<div class="cal">'+[...'一二三四五六日'].map(x=>`<div class="wd">${x}</div>`).join('')+'<i></i>'.repeat(first);

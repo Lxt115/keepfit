@@ -175,6 +175,31 @@ def month(month: str):  # YYYY-MM
     return out
 
 
+@app.get("/api/weeks")
+def weeks(month: str):  # YYYY-MM，返回该月覆盖到的各周（周一至周日）平均体重
+    y, m = int(month[:4]), int(month[5:7])
+    first = dt.date(y, m, 1)
+    last = dt.date(y, m, 1) + dt.timedelta(days=31)
+    last = last.replace(day=1) - dt.timedelta(days=1)
+    start = first - dt.timedelta(days=first.weekday())  # 回退到周一
+    end = last + dt.timedelta(days=6 - last.weekday())  # 前进到周日
+    with closing(db()) as c:
+        rows = c.execute("SELECT date, kg FROM weights WHERE date>=? AND date<=? ORDER BY date, id",
+                         (start.isoformat(), end.isoformat())).fetchall()
+    by_day = {}  # 同一天多次称重取最后一次
+    for r in rows:
+        by_day[r["date"]] = r["kg"]
+    out = []
+    d = start
+    while d <= end:
+        vals = [by_day[k] for k in ((d + dt.timedelta(days=i)).isoformat() for i in range(7)) if k in by_day]
+        if vals:
+            out.append({"start": d.isoformat(), "end": (d + dt.timedelta(days=6)).isoformat(),
+                        "avg": round(sum(vals) / len(vals), 2), "days": len(vals)})
+        d += dt.timedelta(days=7)
+    return out
+
+
 @app.delete("/api/{kind}/{id}")
 def delete(kind: str, id: int):
     if kind not in ("meals", "workouts", "weights", "sleeps"):
