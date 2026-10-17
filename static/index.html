@@ -56,11 +56,18 @@ main{flex:1;min-height:0;overflow-y:auto;padding:6px 16px 16px}
 .adv-hd b{font-size:24px;color:var(--ac);line-height:1}
 .adv-hd span{font-size:12px;color:var(--sub)}
 .adv-hd em{font-style:normal;font-size:13px;flex-basis:100%;margin-top:4px}
-.adv-mac{display:flex;gap:8px;margin:10px 0 8px}
-.adv-mac div{flex:1;text-align:center;background:var(--card);border-radius:10px;padding:6px 0}
-.adv-mac b{display:block;font-size:15px}.adv-mac span{font-size:11px;color:var(--sub)}
 .adv-tip{font-size:13px;color:var(--tx);line-height:1.6}
 .adv-focus{font-size:13px;font-weight:600;color:var(--ac);margin:8px 0 6px}
+.mac-box{display:grid;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--bd)}
+.mac-row{display:grid;grid-template-columns:52px 1fr;align-items:center;gap:8px;font-size:13px}
+.mac-row span{color:var(--sub)}
+.mac-row b{font-size:14px;text-align:right}
+.mac-row b small{font-weight:400;color:var(--sub);font-size:12px}
+.mac-row i{grid-column:1/-1;height:5px;border-radius:3px;background:var(--bd);overflow:hidden}
+.mac-row u{display:block;height:100%;background:var(--ac);border-radius:3px;text-decoration:none}
+.mac-edit{display:flex;align-items:center;gap:4px;margin-top:4px;font-size:11px;color:var(--sub)}
+.mac-edit input{width:44px;text-align:right;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);padding:2px 4px;font:inherit;font-size:12px}
+.mac-edit em{font-style:normal}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .chip{border:1px solid var(--bd);background:var(--card);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--sub)}
 #bar{display:flex;gap:8px;align-items:flex-end;margin:0 12px 8px;padding:6px 6px 6px 8px;background:var(--card);border-radius:26px;box-shadow:0 6px 24px rgba(16,60,40,.14);flex:none}
@@ -188,41 +195,35 @@ function drawDay(d){
   <div class="stats"><div><span>摄入</span><b>${d.intake}</b></div><div><span>运动消耗</span><b>${d.burn}</b></div><div><span>今日预算</span><b>${bud??'-'}</b></div></div></section>`;
   if(!profile.height_cm)h+=`<div class="card">👉 先到「目标」页填写身高体重和减肥目标，才能计算每日预算。</div>`;
   h+=`<div class="card"><div class="sec tap" onclick="fold(this)">饮食<em>${d.intake} kcal<span class="ar">▾</span></em></div><div class="body">`;
+  h+=`<div id="mac"></div>`;
   if(!d.meals.length)h+=`<div class="empty">还没有记录</div>`;
   for(const t of ['早餐','午餐','晚餐','加餐']){
     const L=d.meals.filter(m=>m.meal_type===t);if(!L.length)continue;
     h+=`<div class="grp">${MI[t]} ${t} · ${Math.round(L.reduce((a,m)=>a+m.kcal,0))} kcal</div>`+L.map(m=>`<div class="row"><div class="n">${esc(m.name)}<small>${esc(m.time)} ${esc(m.amount)}</small></div><div class="k">${Math.round(m.kcal)}<button class="x" onclick="del('meals',${m.id})">✕</button></div></div>`).join('')}
-  if(d.meals.length)h+=`<div id="adv"></div><button class="btn adv" onclick="advice()">🥗 饮食建议</button>`;
   h+=`</div></div><div class="card"><div class="sec tap" onclick="fold(this)">运动<em>${d.burn} kcal<span class="ar">▾</span></em></div><div class="body">`;
   h+=d.workouts.map(w=>`<div class="row"><div class="n">${esc(w.name)}<small>${esc(w.detail)}</small></div><div class="k w">-${Math.round(w.kcal)}<button class="x" onclick="del('workouts',${w.id})">✕</button></div></div>`).join('')||`<div class="empty">还没有记录</div>`;
   h+=`</div></div><div class="card"><div class="sec tap" onclick="fold(this)">体重<span class="ar">▾</span></div><div class="body">`+(d.weights.map(w=>`<div class="row"><div class="n">⚖️ ${w.kg} kg</div><div class="k"><button class="x" onclick="del('weights',${w.id})">✕</button></div></div>`).join('')||`<div class="empty">还没有记录</div>`)
   +`</div></div><div class="card"><div class="sec tap" onclick="fold(this)">作息<span class="ar">▾</span></div><div class="body">`+(d.sleeps.map(s=>`<div class="row"><div class="n">${sleepTxt(s)}<small>${esc(s.note)}</small></div><div class="k"><button class="x" onclick="del('sleeps',${s.id})">✕</button></div></div>`).join('')||`<div class="empty">还没有记录</div>`)
   +`</div></div><div class="card"><div class="sec">综合建议</div><div id="sadv"></div><button class="btn adv" onclick="summary()">📊 生成综合建议</button></div><div id="chat"></div>`;
-  $('#main').innerHTML=h;drawChat()}
+  $('#main').innerHTML=h;drawChat();drawMac()}
 function fold(el){el.closest('.card').classList.toggle('fold')}
-const advCache={};  // 饮食建议结果缓存：date -> 结果，供综合建议复用
 function advBox(a,label,extra){
   const sc=Math.max(0,Math.min(100,+a.score||0));
   return `<div class="adv-box"><div class="adv-hd"><b>${sc}</b><span>${label}</span><em>${esc(a.verdict)}</em></div>
   ${extra||''}${(a.tips||[]).map(t=>`<div class="adv-tip">· ${esc(t)}</div>`).join('')}</div>`}
-async function advice(){
-  const el=$('#adv'),btn=el&&el.nextElementSibling;if(!el||btn.disabled)return;
-  btn.disabled=true;btn.textContent='分析中…';
+async function drawMac(){
+  const el=$('#mac');if(!el)return;
   try{
-    const a=await api('advice',{method:'POST',body:{date}});
-    advCache[date]=a;
-    const m=a.macros||{};
-    el.innerHTML=advBox(a,'饮食质量分',`<div class="adv-mac"><div><b>${Math.round(m.carb||0)}g</b><span>碳水</span></div><div><b>${Math.round(m.protein||0)}g</b><span>蛋白质</span></div><div><b>${Math.round(m.fat||0)}g</b><span>脂肪</span></div></div>`);
-    btn.textContent='🔄 重新分析';
-  }catch(e){el.innerHTML=`<div class="adv-box err">${esc(e.message)}</div>`;btn.textContent='🥗 饮食建议'}
-  btn.disabled=false}
+    const m=await api('macros?date='+date),id=m.ideal||{};
+    const row=(k,l)=>`<div class="mac-row"><span>${l}</span><b>${m[k]||0}<small> / ${id[k]||0}g</small></b><i><u style="width:${Math.min(100,(m[k]||0)/(id[k]||1)*100)}%"></u></i></div>`;
+    el.innerHTML=`<div class="mac-box">${row('carb','碳水')}${row('protein','蛋白质')}${row('fat','脂肪')}</div>`;
+  }catch(e){el.innerHTML=''}
+}
 async function summary(){
   const el=$('#sadv'),btn=el&&el.nextElementSibling;if(!el||btn.disabled)return;
-  const diet=advCache[date];
-  if(!diet)return alert('请先生成饮食建议');
   btn.disabled=true;btn.textContent='分析中…';
   try{
-    const a=await api('summary',{method:'POST',body:{date,diet}});
+    const a=await api('summary',{method:'POST',body:{date}});
     el.innerHTML=advBox(a,'综合分',a.focus?`<div class="adv-focus">🎯 ${esc(a.focus)}</div>`:'');
     btn.textContent='🔄 重新生成';
   }catch(e){el.innerHTML=`<div class="adv-box err">${esc(e.message)}</div>`;btn.textContent='📊 生成综合建议'}
@@ -241,7 +242,8 @@ function drawChat(){
     const p=m.p;let h=`<div class="card bot"><div class="why">${esc(p.reply||'')}</div>`;
     if(p.date!==date)h+=`<div class="warn">⚠ 将记录到 ${p.date}</div>`;
     const inp=(t,j,v)=>`<input type="number" inputmode="numeric" value="${v}" ${m.done?'disabled':''} onchange="chat['${date}'][${i}].p.${t}[${j}].kcal=+this.value">`;
-    p.meals.forEach((x,j)=>h+=`<div class="row"><div class="n">${MI[x.meal_type]||'🍽'} ${esc(x.name)}<small>${esc(x.meal_type)} ${esc(x.time)} ${esc(x.amount)}</small></div><div class="k">${inp('meals',j,x.kcal)}</div></div>`);
+    const mac=(j,x)=>`<div class="mac-edit"><span>碳水</span><input type="number" inputmode="numeric" value="${x.carb??''}" ${m.done?'disabled':''} onchange="chat['${date}'][${i}].p.meals[${j}].carb=+this.value"><span>蛋白</span><input type="number" inputmode="numeric" value="${x.protein??''}" ${m.done?'disabled':''} onchange="chat['${date}'][${i}].p.meals[${j}].protein=+this.value"><span>脂肪</span><input type="number" inputmode="numeric" value="${x.fat??''}" ${m.done?'disabled':''} onchange="chat['${date}'][${i}].p.meals[${j}].fat=+this.value"><em>g</em></div>`;
+    p.meals.forEach((x,j)=>h+=`<div class="row"><div class="n">${MI[x.meal_type]||'🍽'} ${esc(x.name)}<small>${esc(x.meal_type)} ${esc(x.time)} ${esc(x.amount)}</small>${mac(j,x)}</div><div class="k">${inp('meals',j,x.kcal)}</div></div>`);
     p.workouts.forEach((x,j)=>h+=`<div class="row"><div class="n">🏃 ${esc(x.name)}<small>${esc(x.detail)}</small></div><div class="k w">${inp('workouts',j,x.kcal)}</div></div>`);
     p.weights.forEach((x,j)=>h+=`<div class="row"><div class="n">⚖️ 体重</div><div class="k"><input type="number" step="0.1" inputmode="decimal" value="${x.kg}" ${m.done?'disabled':''} onchange="chat['${date}'][${i}].p.weights[${j}].kg=+this.value"> kg</div></div>`);
     p.sleeps.forEach(x=>h+=`<div class="row"><div class="n">${sleepTxt(x)}<small>${esc(x.note)}</small></div></div>`);

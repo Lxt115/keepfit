@@ -37,6 +37,10 @@ with closing(db()) as c:
     pcols = {r["name"] for r in c.execute("PRAGMA table_info(profile)")}
     if "bmr" not in pcols:  # 兼容旧库
         c.execute("ALTER TABLE profile ADD COLUMN bmr REAL")
+    mcols = {r["name"] for r in c.execute("PRAGMA table_info(meals)")}
+    for col in ("carb", "protein", "fat"):  # 兼容旧库，旧记录留空
+        if col not in mcols:
+            c.execute(f"ALTER TABLE meals ADD COLUMN {col} REAL")
     c.commit()
 
 
@@ -112,6 +116,54 @@ def budget(burn, p=None):
     deficit = min(max((weight - p["target_weight_kg"]) * 7700 / days, 0), 1000)
     return {"bmr": round(bmr), "base": round(base), "deficit": round(deficit),
             "budget": round(base - deficit + burn)}
+
+
+def macros(date: str, burn: float = 0):
+    """当天三大营养素：优先用记录里已存的数值，旧记录缺失时按食物名称规则估算；理想值按体重与预算推算"""
+    p = get_profile() or {}
+    with closing(db()) as c:
+        rows = c.execute("SELECT name,amount,kcal,carb,protein,fat FROM meals WHERE date=? ORDER BY time,id",
+                         (date,)).fetchall()
+    carb = protein = fat = 0.0
+    for r in rows:
+        if r["carb"] is not None or r["protein"] is not None or r["fat"] is not None:
+            carb += r["carb"] or 0
+            protein += r["protein"] or 0
+            fat += r["fat"] or 0
+            continue
+        # 旧记录没有营养素，按食物名称关键词估算供能占比
+        name = r["name"] or ""
+        kcal = r["kcal"] or 0
+        if any(k in name for k in ("米饭", "面", "面包", "馒头", "粥", "粉", "土豆", "红薯", "玉米", "水果", "香蕉", "苹果")):
+            c_, p_, f_ = .75, .10, .15
+        elif any(k in name for k in ("鸡", "牛", "鱼", "虾", "蛋", "奶", "豆腐", "肉", "蛋白")):
+            c_, p_, f_ = .10, .55, .35
+        elif any(k in name for k in ("油", "坚果", "花生", "芝士", "黄油", "肥肉")):
+            c_, p_, f_ = .10, .10, .80
+        elif any(k in name for k in ("菜", "蔬", "沙拉", "西兰花", "菠菜")):
+            c_, p_, f_ = .60, .25, .15
+        else:
+            c_, p_, f_ = .50, .20, .30
+        carb += kcal * c_ / 4
+        protein += kcal * p_ / 4
+        fat += kcal * f_ / 9
+    # 理想值：蛋白质按体重 1.6g/kg，脂肪占预算 25%，碳水占剩余热量
+    with closing(db()) as c:
+        r = c.execute("SELECT kg FROM weights ORDER BY date DESC, id DESC LIMIT 1").fetchone()
+    weight = r["kg"] if r else p.get("weight_kg") or 65
+    bud = budget(burn, p).get("budget") or 0
+    ideal_protein = round(weight * 1.6)
+    ideal_fat = round(bud * .25 / 9)
+    ideal_carb = round(max(bud - ideal_protein * 4 - ideal_fat * 9, 0) / 4)
+    return {"carb": round(carb), "protein": round(protein), "fat": round(fat),
+            "ideal": {"carb": ideal_carb, "protein": ideal_protein, "fat": ideal_fat}}
+
+
+@app.get("/api/macros")
+def get_macros(date: str):
+    with closing(db()) as c:
+        burn = c.execute("SELECT COALESCE(SUM(kcal),0) FROM workouts WHERE date=?", (date,)).fetchone()[0]
+    return macros(date, burn)
 
 
 @app.get("/api/day")
@@ -211,11 +263,12 @@ def delete(kind: str, id: int):
 
 
 SYSTEM = """你是饮食与运动记录助手。把用户消息拆分成结构化记录，只输出一个JSON对象，不要任何其他文字：
-{{"date":"YYYY-MM-DD","meals":[{{"time":"HH:MM","meal_type":"早餐|午餐|晚餐|加餐","name":"","amount":"","kcal":0}}],
+{{"date":"YYYY-MM-DD","meals":[{{"time":"HH:MM","meal_type":"早餐|午餐|晚餐|加餐","name":"","amount":"","kcal":0,"carb":0,"protein":0,"fat":0}}],
 "workouts":[{{"name":"","detail":"","kcal":0}}],"weights":[{{"kg":0.0}}],"sleeps":[{{"sleep_time":"YYYY-MM-DD HH:MM","wake_time":"YYYY-MM-DD HH:MM","nap_sleep_time":"YYYY-MM-DD HH:MM","nap_wake_time":"YYYY-MM-DD HH:MM","note":""}}],"reply":"一句简短中文说明/估算依据，需要追问时写在这里"}}
 规则：
 1. 今天是{today}，现在时间{now}，用户当前查看的日期是{date}。date默认取查看日期；消息里若有明确日期（如“1001”表示10月1日，年份取今年）则用该日期。
 2. 用户直接给出kcal就原样使用；否则根据食物和份量估算（拳头大小≈一个中等水果/约150-200g主食），kcal为整数。
+2.1 每条饮食同时估算三大营养素克数：carb为碳水、protein为蛋白质、fat为脂肪，均为整数；三者热量之和应接近kcal（碳水4kcal/g、蛋白质4kcal/g、脂肪9kcal/g）。用户直接给出营养素数值时原样使用。
 3. 时间：用户说“刚起床/刚吃/现在”等用现在时间；说了具体时间用该时间；否则早餐08:00、午餐12:30、晚餐18:30、加餐16:00。meal_type按用户描述或时间判断。
 4. 运动：每个动作/项目单独一条，name为项目名，detail保留用户原始数据（时长/组数x次数/重量），kcal按体重{weight}kg估算该项目消耗；力量训练考虑组数、次数、重量和间歇；辅助引体向上的重量是辅助重量。
 5. 用户发的图片如果是食物就识别并估算；如果是营养成分表就按表计算。
@@ -304,88 +357,25 @@ def parse(b: ParseIn):
     return data
 
 
-ADVICE_SYSTEM = """你是营养师。根据用户某天的饮食记录，评估营养是否均衡、健康、是否利于减脂，只输出一个JSON对象，不要任何其他文字：
-{{"macros":{{"carb":0,"protein":0,"fat":0}},"score":0,"verdict":"","tips":["",""]}}
-字段说明：
-- macros：估算当天碳水、蛋白质、脂肪的克数（整数）。
-- score：0-100 的饮食质量分，综合营养均衡度、食物质量、减脂适配度。
-- verdict：一句话总评（不超过30字），点明是否均衡、是否利于减脂。
-- tips：2-3条具体可执行的改进建议，每条不超过25字，针对当天缺口给出食物建议。
-规则：
-1. 用户资料：性别{sex}，年龄{age}岁，身高{height}cm，体重{weight}kg，目标体重{target}kg，每日热量预算{budget}kcal，当天摄入{intake}kcal，运动消耗{burn}kcal。
-2. 参考中国居民膳食指南与减脂期常见配比（蛋白质约每公斤体重1.2-1.6g，脂肪占总热量20-30%，碳水占45-55%），判断三大营养素是否达标与比例是否合理。
-3. 结合食物种类判断质量：蔬果、全谷物、优质蛋白是否充足，精制碳水、油炸、含糖饮料、加工肉是否偏多。
-4. 前一天饮食仅作趋势参考：若同类问题连续出现，建议可更明确；若只是单日波动，不必过度提醒。
-5. 语气简洁务实，不堆砌术语，不输出markdown。
-【当天饮食】
-{today}
-【前一天饮食】
-{yesterday}"""
-
-
-class AdviceIn(BaseModel):
-    date: str
-
-
-def day_meals_text(date: str) -> str:
-    """把某天的饮食记录拼成一行文本，供营养分析使用"""
-    with closing(db()) as c:
-        rows = c.execute("SELECT time,meal_type,name,amount,kcal FROM meals WHERE date=? ORDER BY time,id",
-                         (date,)).fetchall()
-    if not rows:
-        return "（无记录）"
-    return "；".join(f'{r["meal_type"]} {r["name"]} {r["amount"] or ""} {round(r["kcal"] or 0)}kcal'.replace("  ", " ").strip()
-                    for r in rows)
-
-
-@app.post("/api/advice")
-def advice(b: AdviceIn):
-    p = get_profile() or {}
-    with closing(db()) as c:
-        intake = c.execute("SELECT COALESCE(SUM(kcal),0) FROM meals WHERE date=?", (b.date,)).fetchone()[0]
-        burn = c.execute("SELECT COALESCE(SUM(kcal),0) FROM workouts WHERE date=?", (b.date,)).fetchone()[0]
-    if not intake:
-        raise HTTPException(400, "当天还没有饮食记录")
-    prev = (dt.date.fromisoformat(b.date) - dt.timedelta(days=1)).isoformat()
-    sys = ADVICE_SYSTEM.format(
-        sex="女" if p.get("sex") == "female" else "男", age=p.get("age", "-"), height=p.get("height_cm", "-"),
-        weight=p.get("weight_kg", "-"), target=p.get("target_weight_kg", "-"),
-        budget=budget(burn).get("budget", "-"), intake=round(intake), burn=round(burn),
-        today=day_meals_text(b.date), yesterday=day_meals_text(prev))
-    try:
-        r = call_model([{"role": "system", "content": sys},
-                        {"role": "user", "content": f"请评估 {b.date} 的饮食"}])
-        data = json.loads(r.choices[0].message.content)
-    except APITimeoutError:
-        raise HTTPException(504, "模型响应超时（60s），请重试")
-    except Exception as e:
-        raise HTTPException(502, f"模型调用/解析失败: {e}")
-    data.setdefault("macros", {})
-    data.setdefault("score", 0)
-    data.setdefault("verdict", "")
-    data.setdefault("tips", [])
-    return data
-
-
 class SummaryIn(BaseModel):
     date: str
-    diet: dict = {}  # 当天饮食建议结果
 
 
-SUMMARY_SYSTEM = """你是减脂顾问。根据用户当天的饮食建议，结合运动消耗，给出综合结论，只输出一个JSON对象，不要任何其他文字：
+SUMMARY_SYSTEM = """你是减脂顾问。根据用户当天的饮食记录与营养素摄入，给出综合结论，只输出一个JSON对象，不要任何其他文字：
 {{"score":0,"verdict":"","focus":"","tips":["",""]}}
 字段说明：
 - score：0-100 的综合分，综合饮食质量与热量缺口。
 - verdict：一句话总评（不超过30字），点明当天整体是否利于减脂。
 - focus：当天最需要改进的一件事（不超过20字）。
-- tips：2-3条综合建议，每条不超过25字，避免与已有饮食建议重复。
+- tips：2-3条综合建议，每条不超过25字。
 规则：
 1. 用户资料：性别{sex}，年龄{age}岁，体重{weight}kg，目标体重{target}kg，每日热量预算{budget}kcal，当天摄入{intake}kcal，运动消耗{burn}kcal。
-2. 综合判断：热量缺口是否合理、蛋白质是否充足、饮食质量与运动消耗是否匹配。
-3. 若饮食建议与热量缺口存在冲突或互补，明确指出；若数据缺失，说明局限并给出可执行建议。
-4. 语气简洁务实，不堆砌术语，不输出markdown。
-【当天饮食建议】
-{diet}"""
+2. 营养素：碳水{carb}g（理想{ideal_carb}g）、蛋白质{protein}g（理想{ideal_protein}g）、脂肪{fat}g（理想{ideal_fat}g）。
+3. 综合判断：热量缺口是否合理、蛋白质是否充足、三大营养素比例是否合理。
+4. 若营养素与热量缺口存在冲突或互补，明确指出；若数据缺失，说明局限并给出可执行建议。
+5. 语气简洁务实，不堆砌术语，不输出markdown。
+【当天饮食】
+{meals}"""
 
 
 @app.post("/api/summary")
@@ -394,13 +384,16 @@ def summary(b: SummaryIn):
     with closing(db()) as c:
         intake = c.execute("SELECT COALESCE(SUM(kcal),0) FROM meals WHERE date=?", (b.date,)).fetchone()[0]
         burn = c.execute("SELECT COALESCE(SUM(kcal),0) FROM workouts WHERE date=?", (b.date,)).fetchone()[0]
-    if not b.diet:
-        raise HTTPException(400, "请先生成饮食建议")
+    if not intake:
+        raise HTTPException(400, "当天还没有饮食记录")
+    m = macros(b.date, burn)
     sys = SUMMARY_SYSTEM.format(
         sex="女" if p.get("sex") == "female" else "男", age=p.get("age", "-"),
         weight=p.get("weight_kg", "-"), target=p.get("target_weight_kg", "-"),
         budget=budget(burn).get("budget", "-"), intake=round(intake), burn=round(burn),
-        diet=json.dumps(b.diet, ensure_ascii=False))
+        carb=m["carb"], protein=m["protein"], fat=m["fat"],
+        ideal_carb=m["ideal"]["carb"], ideal_protein=m["ideal"]["protein"], ideal_fat=m["ideal"]["fat"],
+        meals=day_meals_text(b.date))
     try:
         r = call_model([{"role": "system", "content": sys},
                         {"role": "user", "content": f"请给出 {b.date} 的综合建议"}])
@@ -428,8 +421,9 @@ class Commit(BaseModel):
 def commit(b: Commit):
     with closing(db()) as c:
         for m in b.meals:
-            c.execute("INSERT INTO meals(date,time,meal_type,name,amount,kcal) VALUES(?,?,?,?,?,?)",
-                      (b.date, m.get("time"), m.get("meal_type"), m.get("name"), m.get("amount"), m.get("kcal", 0)))
+            c.execute("INSERT INTO meals(date,time,meal_type,name,amount,kcal,carb,protein,fat) VALUES(?,?,?,?,?,?,?,?,?)",
+                      (b.date, m.get("time"), m.get("meal_type"), m.get("name"), m.get("amount"), m.get("kcal", 0),
+                       m.get("carb"), m.get("protein"), m.get("fat")))
         for w in b.workouts:
             c.execute("INSERT INTO workouts(date,name,detail,kcal) VALUES(?,?,?,?)",
                       (b.date, w.get("name"), w.get("detail"), w.get("kcal", 0)))
