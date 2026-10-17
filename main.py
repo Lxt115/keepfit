@@ -304,6 +304,69 @@ def parse(b: ParseIn):
     return data
 
 
+ADVICE_SYSTEM = """你是营养师。根据用户某天的饮食记录，评估营养是否均衡、健康、是否利于减脂，只输出一个JSON对象，不要任何其他文字：
+{{"macros":{{"carb":0,"protein":0,"fat":0}},"score":0,"verdict":"","tips":["",""]}}
+字段说明：
+- macros：估算当天碳水、蛋白质、脂肪的克数（整数）。
+- score：0-100 的饮食质量分，综合营养均衡度、食物质量、减脂适配度。
+- verdict：一句话总评（不超过30字），点明是否均衡、是否利于减脂。
+- tips：2-3条具体可执行的改进建议，每条不超过25字，针对当天缺口给出食物建议。
+规则：
+1. 用户资料：性别{sex}，年龄{age}岁，身高{height}cm，体重{weight}kg，目标体重{target}kg，每日热量预算{budget}kcal，当天摄入{intake}kcal，运动消耗{burn}kcal。
+2. 参考中国居民膳食指南与减脂期常见配比（蛋白质约每公斤体重1.2-1.6g，脂肪占总热量20-30%，碳水占45-55%），判断三大营养素是否达标与比例是否合理。
+3. 结合食物种类判断质量：蔬果、全谷物、优质蛋白是否充足，精制碳水、油炸、含糖饮料、加工肉是否偏多。
+4. 前一天饮食仅作趋势参考：若同类问题连续出现，建议可更明确；若只是单日波动，不必过度提醒。
+5. 语气简洁务实，不堆砌术语，不输出markdown。
+【当天饮食】
+{today}
+【前一天饮食】
+{yesterday}"""
+
+
+class AdviceIn(BaseModel):
+    date: str
+
+
+def day_meals_text(date: str) -> str:
+    """把某天的饮食记录拼成一行文本，供营养分析使用"""
+    with closing(db()) as c:
+        rows = c.execute("SELECT time,meal_type,name,amount,kcal FROM meals WHERE date=? ORDER BY time,id",
+                         (date,)).fetchall()
+    if not rows:
+        return "（无记录）"
+    return "；".join(f'{r["meal_type"]} {r["name"]} {r["amount"] or ""} {round(r["kcal"] or 0)}kcal'.replace("  ", " ").strip()
+                    for r in rows)
+
+
+@app.post("/api/advice")
+def advice(b: AdviceIn):
+    p = get_profile() or {}
+    with closing(db()) as c:
+        intake = c.execute("SELECT COALESCE(SUM(kcal),0) FROM meals WHERE date=?", (b.date,)).fetchone()[0]
+        burn = c.execute("SELECT COALESCE(SUM(kcal),0) FROM workouts WHERE date=?", (b.date,)).fetchone()[0]
+    if not intake:
+        raise HTTPException(400, "当天还没有饮食记录")
+    prev = (dt.date.fromisoformat(b.date) - dt.timedelta(days=1)).isoformat()
+    sys = ADVICE_SYSTEM.format(
+        sex="女" if p.get("sex") == "female" else "男", age=p.get("age", "-"), height=p.get("height_cm", "-"),
+        weight=p.get("weight_kg", "-"), target=p.get("target_weight_kg", "-"),
+        budget=budget(burn).get("budget", "-"), intake=round(intake), burn=round(burn),
+        today=day_meals_text(b.date), yesterday=day_meals_text(prev))
+    try:
+        r = call_model([{"role": "system", "content": sys},
+                        {"role": "user", "content": f"请评估 {b.date} 的饮食"}])
+        data = json.loads(r.choices[0].message.content)
+    except APITimeoutError:
+        raise HTTPException(504, "模型响应超时（60s），请重试")
+    except Exception as e:
+        raise HTTPException(502, f"模型调用/解析失败: {e}")
+    data.setdefault("macros", {})
+    data.setdefault("score", 0)
+    data.setdefault("verdict", "")
+    data.setdefault("tips", [])
+    return data
+
+
 class Commit(BaseModel):
     date: str
     meals: list[dict] = []
