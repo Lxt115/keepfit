@@ -323,27 +323,6 @@ ADVICE_SYSTEM = """你是营养师。根据用户某天的饮食记录，评估�
 {yesterday}"""
 
 
-WORKOUT_SYSTEM = """你是运动教练。根据用户近7天的运动与作息记录，评估当天运动是否合理、是否利于减脂，只输出一个JSON对象，不要任何其他文字：
-{{"score":0,"verdict":"","volume":"","tips":["",""]}}
-字段说明：
-- score：0-100 的运动质量分，综合运动量、强度、频率、恢复情况。
-- verdict：一句话总评（不超过30字），点明当天运动是否合理、是否利于减脂。
-- volume：当天运动量概述（不超过20字），如“力量40分钟+有氧20分钟，消耗约350kcal”。
-- tips：2-3条具体可执行的建议，每条不超过25字，针对训练安排或恢复给出。
-规则：
-1. 用户资料：性别{sex}，年龄{age}岁，体重{weight}kg，目标体重{target}kg，每日热量预算{budget}kcal。
-2. 参考减脂期运动建议：每周3-5次运动，力量训练与有氧结合，单次有效运动30-60分钟，避免连续高强度无休息。
-3. 结合近7天记录判断频率与恢复：若连续多天高强度训练，提醒休息；若运动频率过低，给出可执行的起步建议。
-4. 作息影响恢复：睡眠不足时降低强度建议，并提示睡眠对减脂的作用。
-5. 语气简洁务实，不堆砌术语，不输出markdown。
-【当天运动】
-{today}
-【近7天运动】
-{week}
-【近7天作息】
-{sleep}"""
-
-
 class AdviceIn(BaseModel):
     date: str
 
@@ -357,46 +336,6 @@ def day_meals_text(date: str) -> str:
         return "（无记录）"
     return "；".join(f'{r["meal_type"]} {r["name"]} {r["amount"] or ""} {round(r["kcal"] or 0)}kcal'.replace("  ", " ").strip()
                     for r in rows)
-
-
-def day_workouts_text(date: str) -> str:
-    """把某天的运动记录拼成一行文本"""
-    with closing(db()) as c:
-        rows = c.execute("SELECT name,detail,kcal FROM workouts WHERE date=? ORDER BY id", (date,)).fetchall()
-    if not rows:
-        return "（无记录）"
-    return "；".join(f'{r["name"]} {r["detail"] or ""} {round(r["kcal"] or 0)}kcal'.replace("  ", " ").strip()
-                    for r in rows)
-
-
-def recent_workouts_text(date: str, days: int = 7) -> str:
-    """近若干天的运动汇总，按日期分组"""
-    start = (dt.date.fromisoformat(date) - dt.timedelta(days=days - 1)).isoformat()
-    with closing(db()) as c:
-        rows = c.execute("SELECT date,name,detail,kcal FROM workouts WHERE date>=? AND date<=? ORDER BY date,id",
-                         (start, date)).fetchall()
-    if not rows:
-        return "（无记录）"
-    by_date = {}
-    for r in rows:
-        by_date.setdefault(r["date"], []).append(r)
-    return "\n".join(f'{d}: ' + "；".join(f'{r["name"]} {r["detail"] or ""} {round(r["kcal"] or 0)}kcal'.replace("  ", " ").strip()
-                                          for r in by_date[d])
-                     for d in sorted(by_date))
-
-
-def recent_sleep_text(date: str, days: int = 7) -> str:
-    """近若干天的睡眠时长汇总"""
-    start = (dt.date.fromisoformat(date) - dt.timedelta(days=days - 1)).isoformat()
-    with closing(db()) as c:
-        rows = c.execute("SELECT date,sleep_time,wake_time,nap_sleep_time,nap_wake_time FROM sleeps "
-                         "WHERE date>=? AND date<=? ORDER BY date,id", (start, date)).fetchall()
-    by_date = {}
-    for r in rows:
-        by_date[r["date"]] = by_date.get(r["date"], 0) + row_sleep_minutes(r)
-    if not by_date:
-        return "（无记录）"
-    return "\n".join(f'{d}: {m // 60}h{m % 60}m' for d, m in sorted(by_date.items()) if m)
 
 
 @app.post("/api/advice")
@@ -428,55 +367,25 @@ def advice(b: AdviceIn):
     return data
 
 
-@app.post("/api/workout-advice")
-def workout_advice(b: AdviceIn):
-    p = get_profile() or {}
-    with closing(db()) as c:
-        burn = c.execute("SELECT COALESCE(SUM(kcal),0) FROM workouts WHERE date=?", (b.date,)).fetchone()[0]
-    if not burn:
-        raise HTTPException(400, "当天还没有运动记录")
-    sys = WORKOUT_SYSTEM.format(
-        sex="女" if p.get("sex") == "female" else "男", age=p.get("age", "-"),
-        weight=p.get("weight_kg", "-"), target=p.get("target_weight_kg", "-"),
-        budget=budget(burn).get("budget", "-"),
-        today=day_workouts_text(b.date), week=recent_workouts_text(b.date), sleep=recent_sleep_text(b.date))
-    try:
-        r = call_model([{"role": "system", "content": sys},
-                        {"role": "user", "content": f"请评估 {b.date} 的运动"}])
-        data = json.loads(r.choices[0].message.content)
-    except APITimeoutError:
-        raise HTTPException(504, "模型响应超时（60s），请重试")
-    except Exception as e:
-        raise HTTPException(502, f"模型调用/解析失败: {e}")
-    data.setdefault("score", 0)
-    data.setdefault("verdict", "")
-    data.setdefault("volume", "")
-    data.setdefault("tips", [])
-    return data
-
-
 class SummaryIn(BaseModel):
     date: str
     diet: dict = {}  # 当天饮食建议结果
-    workout: dict = {}  # 当天运动建议结果
 
 
-SUMMARY_SYSTEM = """你是减脂顾问。根据用户当天的饮食建议与运动建议，给出综合结论，只输出一个JSON对象，不要任何其他文字：
+SUMMARY_SYSTEM = """你是减脂顾问。根据用户当天的饮食建议，结合运动消耗，给出综合结论，只输出一个JSON对象，不要任何其他文字：
 {{"score":0,"verdict":"","focus":"","tips":["",""]}}
 字段说明：
-- score：0-100 的综合分，综合饮食与运动两方面。
+- score：0-100 的综合分，综合饮食质量与热量缺口。
 - verdict：一句话总评（不超过30字），点明当天整体是否利于减脂。
 - focus：当天最需要改进的一件事（不超过20字）。
-- tips：2-3条综合建议，每条不超过25字，兼顾饮食与运动，避免与已有建议重复。
+- tips：2-3条综合建议，每条不超过25字，避免与已有饮食建议重复。
 规则：
 1. 用户资料：性别{sex}，年龄{age}岁，体重{weight}kg，目标体重{target}kg，每日热量预算{budget}kcal，当天摄入{intake}kcal，运动消耗{burn}kcal。
-2. 综合饮食与运动两方面判断：热量缺口是否合理、蛋白质是否充足、运动量是否匹配、恢复是否足够。
-3. 若饮食与运动建议存在冲突或互补，明确指出；若某方面数据缺失，说明局限并给出可执行建议。
+2. 综合判断：热量缺口是否合理、蛋白质是否充足、饮食质量与运动消耗是否匹配。
+3. 若饮食建议与热量缺口存在冲突或互补，明确指出；若数据缺失，说明局限并给出可执行建议。
 4. 语气简洁务实，不堆砌术语，不输出markdown。
 【当天饮食建议】
-{diet}
-【当天运动建议】
-{workout}"""
+{diet}"""
 
 
 @app.post("/api/summary")
@@ -485,14 +394,13 @@ def summary(b: SummaryIn):
     with closing(db()) as c:
         intake = c.execute("SELECT COALESCE(SUM(kcal),0) FROM meals WHERE date=?", (b.date,)).fetchone()[0]
         burn = c.execute("SELECT COALESCE(SUM(kcal),0) FROM workouts WHERE date=?", (b.date,)).fetchone()[0]
-    if not b.diet and not b.workout:
-        raise HTTPException(400, "请先生成饮食建议或运动建议")
+    if not b.diet:
+        raise HTTPException(400, "请先生成饮食建议")
     sys = SUMMARY_SYSTEM.format(
         sex="女" if p.get("sex") == "female" else "男", age=p.get("age", "-"),
         weight=p.get("weight_kg", "-"), target=p.get("target_weight_kg", "-"),
         budget=budget(burn).get("budget", "-"), intake=round(intake), burn=round(burn),
-        diet=json.dumps(b.diet, ensure_ascii=False) if b.diet else "（未生成）",
-        workout=json.dumps(b.workout, ensure_ascii=False) if b.workout else "（未生成）")
+        diet=json.dumps(b.diet, ensure_ascii=False))
     try:
         r = call_model([{"role": "system", "content": sys},
                         {"role": "user", "content": f"请给出 {b.date} 的综合建议"}])
